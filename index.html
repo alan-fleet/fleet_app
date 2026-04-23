@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FleetUp</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial;
+            padding: 15px;
+            background: #f0f0f0;
+        }
+        h1 {
+            text-align: center;
+        }
+        .card {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 10px;
+        }
+        input, button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+        }
+        button {
+            background: black;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        .update-btn {
+            background: #007bff;
+        }
+    </style>
+</head>
+<body>
+
+<h1>🚗 FleetUp</h1>
+
+<h3>Agregar vehículo</h3>
+
+<input id="patente" placeholder="Patente">
+<input id="modelo" placeholder="Modelo">
+<input id="km" placeholder="Kilómetros">
+
+<button onclick="crearVehiculo()">Guardar</button>
+
+<h3>Vehículos</h3>
+
+<div id="lista"></div>
+
+<script>
+const API = window.location.origin;
+
+function crearVehiculo() {
+    fetch(`${API}/vehicles/?patente=${patente.value}&modelo=${modelo.value}&km_actual=${km.value}`, {
+        method: "POST"
+    }).then(() => {
+        cargarVehiculos();
+    });
+}
+
+function actualizarKM(id, kmActual) {
+    let nuevoKm = prompt("Nuevo kilometraje:", kmActual);
+    if (!nuevoKm) return;
+
+    fetch(`${API}/vehicles/${id}?patente=TEMP&modelo=TEMP&km_actual=${nuevoKm}`, {
+        method: "PUT"
+    }).then(() => cargarVehiculos());
+}
+
+function cargarVehiculos() {
+    fetch(`${API}/vehicles/`)
+    .then(res => res.json())
+    .then(data => {
+        lista.innerHTML = "";
+        data.forEach(v => {
+            lista.innerHTML += `
+                <div class="card">
+                    <b>${v.modelo}</b><br>
+                    Patente: ${v.patente}<br>
+                    KM: ${v.km_actual}<br>
+                    Último service: ${v.ultimo_service_km || "-"}<br>
+                    Próximo service: ${v.proximo_service_km || "-"}<br><br>
+                    <button class="update-btn" onclick="actualizarKM(${v.id}, ${v.km_actual})">
+                        Actualizar KM
+                    </button>
+                </div>
+            `;
+        });
+    });
+}
+
+cargarVehiculos();
+</script>
+
+</body>
+</html>
