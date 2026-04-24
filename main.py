@@ -144,6 +144,25 @@ def home():
             <p><strong>KM asignación:</strong> {v.km_asignacion}</p>
             <p><strong>Valor mensual:</strong> {v.valor_mensual or "-"}</p>
 
+            <form method="post" action="/update_km">
+                <input type="hidden" name="vehicle_id" value="{v.id}">
+                <input name="nuevo_km" type="number" placeholder="Nuevo KM" required>
+                <button type="submit">Actualizar KM</button>
+            </form>
+
+            <form method="post" action="/edit_vehicle">
+                <input type="hidden" name="vehicle_id" value="{v.id}">
+
+                <p><input name="patente" value="{v.patente}" required></p>
+                <p><input name="modelo" value="{v.modelo}" required></p>
+                <p><input name="empresa_asignada" value="{v.empresa_asignada}"></p>
+                <p><input name="fecha_asignacion" value="{v.fecha_asignacion}"></p>
+                <p><input name="km_asignacion" type="number" value="{v.km_asignacion}"></p>
+                <p><input name="valor_mensual" value="{v.valor_mensual}"></p>
+
+                <button type="submit">✏️ Editar vehículo</button>
+            </form>
+
             <hr>
 
             <h4>🛠 Registrar service</h4>
@@ -204,6 +223,57 @@ def add_vehicle(
     return RedirectResponse("/", status_code=302)
 
 # =========================
+# EDITAR VEHÍCULO
+# =========================
+
+@app.post("/edit_vehicle")
+def edit_vehicle(
+    vehicle_id: int = Form(...),
+    patente: str = Form(...),
+    modelo: str = Form(...),
+    empresa_asignada: str = Form(""),
+    fecha_asignacion: str = Form(""),
+    km_asignacion: int = Form(0),
+    valor_mensual: str = Form("")
+):
+    db = SessionLocal()
+
+    vehicle = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
+
+    if vehicle:
+        vehicle.patente = patente
+        vehicle.modelo = modelo
+        vehicle.empresa_asignada = empresa_asignada
+        vehicle.fecha_asignacion = fecha_asignacion
+        vehicle.km_asignacion = km_asignacion
+        vehicle.valor_mensual = valor_mensual
+
+        db.commit()
+
+    db.close()
+    return RedirectResponse("/", status_code=302)
+
+# =========================
+# ACTUALIZAR KM
+# =========================
+
+@app.post("/update_km")
+def update_km(
+    vehicle_id: int = Form(...),
+    nuevo_km: int = Form(...)
+):
+    db = SessionLocal()
+
+    vehicle = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
+
+    if vehicle:
+        vehicle.kilometros = nuevo_km
+        db.commit()
+
+    db.close()
+    return RedirectResponse("/", status_code=302)
+
+# =========================
 # AGREGAR SERVICE
 # =========================
 
@@ -229,7 +299,6 @@ def add_service(
 
     db.add(nuevo_service)
 
-    # actualizar KM actual automáticamente
     vehicle = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
     if vehicle:
         vehicle.kilometros = kilometraje
