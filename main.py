@@ -45,7 +45,11 @@ class Vehicle(Base):
     km_asignacion = Column(Integer, default=0)
     valor_mensual = Column(String, default="")
 
-    services = relationship("Service", back_populates="vehicle")
+    services = relationship(
+        "Service",
+        back_populates="vehicle",
+        cascade="all, delete-orphan"
+    )
 
 
 class Service(Base):
@@ -128,6 +132,11 @@ def home():
                 {s.tipo_service} |
                 ${s.costo} |
                 {s.observaciones}
+
+                <form method="post" action="/delete_service" style="display:inline;">
+                    <input type="hidden" name="service_id" value="{s.id}">
+                    <button type="submit">🗑 Eliminar service</button>
+                </form>
             </li>
             """
 
@@ -161,6 +170,11 @@ def home():
                 <p><input name="valor_mensual" value="{v.valor_mensual}"></p>
 
                 <button type="submit">✏️ Editar vehículo</button>
+            </form>
+
+            <form method="post" action="/delete_vehicle">
+                <input type="hidden" name="vehicle_id" value="{v.id}">
+                <button type="submit">🗑 Eliminar vehículo</button>
             </form>
 
             <hr>
@@ -247,7 +261,6 @@ def edit_vehicle(
         vehicle.fecha_asignacion = fecha_asignacion
         vehicle.km_asignacion = km_asignacion
         vehicle.valor_mensual = valor_mensual
-
         db.commit()
 
     db.close()
@@ -306,4 +319,42 @@ def add_service(
     db.commit()
     db.close()
 
+    return RedirectResponse("/", status_code=302)
+
+# =========================
+# ELIMINAR VEHÍCULO
+# =========================
+
+@app.post("/delete_vehicle")
+def delete_vehicle(
+    vehicle_id: int = Form(...)
+):
+    db = SessionLocal()
+
+    vehicle = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
+
+    if vehicle:
+        db.delete(vehicle)
+        db.commit()
+
+    db.close()
+    return RedirectResponse("/", status_code=302)
+
+# =========================
+# ELIMINAR SERVICE
+# =========================
+
+@app.post("/delete_service")
+def delete_service(
+    service_id: int = Form(...)
+):
+    db = SessionLocal()
+
+    service = db.query(Service).filter(Service.id == service_id).first()
+
+    if service:
+        db.delete(service)
+        db.commit()
+
+    db.close()
     return RedirectResponse("/", status_code=302)
