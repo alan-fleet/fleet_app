@@ -1,11 +1,3 @@
-# main.py COMPLETO con alertas automáticas de service
-# Regla:
-# 🟡 Amarillo desde +13.000 km desde último service
-# 🔴 Rojo desde +14.000 km desde último service
-# 🟢 Verde antes de eso
-
-# (Pegar reemplazando TODO el archivo main.py actual)
-
 import os
 from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -13,6 +5,10 @@ from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 
 app = FastAPI()
+
+# =========================
+# BASE DE DATOS
+# =========================
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./vehicles.db")
 
@@ -76,7 +72,7 @@ Base.metadata.create_all(bind=engine)
 
 
 # =========================
-# ALERTAS SERVICE
+# ALERTAS AUTOMÁTICAS
 # =========================
 
 def calcular_alerta(vehicle):
@@ -118,7 +114,7 @@ HTML = """
     <p><input name="modelo" placeholder="Modelo" required></p>
     <p><input name="kilometros" type="number" placeholder="Kilómetros actuales" required></p>
 
-    <h3>Asignación comercial</h3>
+    <h3>🏢 Asignación comercial</h3>
 
     <p><input name="empresa_asignada" placeholder="Empresa asignada"></p>
     <p><input name="fecha_asignacion" placeholder="Fecha asignación"></p>
@@ -241,3 +237,164 @@ def home():
 
     db.close()
     return HTML.format(vehicles=html_vehicles)
+
+
+# =========================
+# AGREGAR VEHÍCULO
+# =========================
+
+@app.post("/add_vehicle")
+def add_vehicle(
+    patente: str = Form(...),
+    modelo: str = Form(...),
+    kilometros: int = Form(...),
+    empresa_asignada: str = Form(""),
+    fecha_asignacion: str = Form(""),
+    km_asignacion: int = Form(0),
+    valor_mensual: str = Form("")
+):
+    db = SessionLocal()
+
+    nuevo = Vehicle(
+        patente=patente,
+        modelo=modelo,
+        kilometros=kilometros,
+        empresa_asignada=empresa_asignada,
+        fecha_asignacion=fecha_asignacion,
+        km_asignacion=km_asignacion,
+        valor_mensual=valor_mensual
+    )
+
+    db.add(nuevo)
+    db.commit()
+    db.close()
+
+    return RedirectResponse("/", status_code=302)
+
+
+# =========================
+# EDITAR VEHÍCULO
+# =========================
+
+@app.post("/edit_vehicle")
+def edit_vehicle(
+    vehicle_id: int = Form(...),
+    patente: str = Form(...),
+    modelo: str = Form(...),
+    empresa_asignada: str = Form(""),
+    fecha_asignacion: str = Form(""),
+    km_asignacion: int = Form(0),
+    valor_mensual: str = Form("")
+):
+    db = SessionLocal()
+
+    vehicle = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
+
+    if vehicle:
+        vehicle.patente = patente
+        vehicle.modelo = modelo
+        vehicle.empresa_asignada = empresa_asignada
+        vehicle.fecha_asignacion = fecha_asignacion
+        vehicle.km_asignacion = km_asignacion
+        vehicle.valor_mensual = valor_mensual
+        db.commit()
+
+    db.close()
+    return RedirectResponse("/", status_code=302)
+
+
+# =========================
+# ACTUALIZAR KM
+# =========================
+
+@app.post("/update_km")
+def update_km(
+    vehicle_id: int = Form(...),
+    nuevo_km: int = Form(...)
+):
+    db = SessionLocal()
+
+    vehicle = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
+
+    if vehicle:
+        vehicle.kilometros = nuevo_km
+        db.commit()
+
+    db.close()
+    return RedirectResponse("/", status_code=302)
+
+
+# =========================
+# AGREGAR SERVICE
+# =========================
+
+@app.post("/add_service")
+def add_service(
+    vehicle_id: int = Form(...),
+    fecha: str = Form(...),
+    kilometraje: int = Form(...),
+    tipo_service: str = Form(...),
+    costo: str = Form(...),
+    observaciones: str = Form("")
+):
+    db = SessionLocal()
+
+    nuevo_service = Service(
+        vehicle_id=vehicle_id,
+        fecha=fecha,
+        kilometraje=kilometraje,
+        tipo_service=tipo_service,
+        costo=costo,
+        observaciones=observaciones
+    )
+
+    db.add(nuevo_service)
+
+    vehicle = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
+    if vehicle:
+        vehicle.kilometros = kilometraje
+
+    db.commit()
+    db.close()
+
+    return RedirectResponse("/", status_code=302)
+
+
+# =========================
+# ELIMINAR VEHÍCULO
+# =========================
+
+@app.post("/delete_vehicle")
+def delete_vehicle(
+    vehicle_id: int = Form(...)
+):
+    db = SessionLocal()
+
+    vehicle = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
+
+    if vehicle:
+        db.delete(vehicle)
+        db.commit()
+
+    db.close()
+    return RedirectResponse("/", status_code=302)
+
+
+# =========================
+# ELIMINAR SERVICE
+# =========================
+
+@app.post("/delete_service")
+def delete_service(
+    service_id: int = Form(...)
+):
+    db = SessionLocal()
+
+    service = db.query(Service).filter(Service.id == service_id).first()
+
+    if service:
+        db.delete(service)
+        db.commit()
+
+    db.close()
+    return RedirectResponse("/", status_code=302)
