@@ -76,9 +76,19 @@ Base.metadata.create_all(bind=engine)
 # =========================
 
 def calcular_alerta(vehicle):
-    if not vehicle.services:
-        return "🟢 Sin services cargados", "#d4edda"
 
+    # Si NO tiene services cargados
+    if not vehicle.services:
+        if vehicle.kilometros >= 14000:
+            return "🔴 Service vencido", "#f8d7da"
+
+        elif vehicle.kilometros >= 13000:
+            return "🟡 Próximo service", "#fff3cd"
+
+        else:
+            return "🟢 Todo OK", "#d4edda"
+
+    # Si SÍ tiene services cargados
     ultimo_service = max(vehicle.services, key=lambda s: s.kilometraje)
     km_desde_service = vehicle.kilometros - ultimo_service.kilometraje
 
