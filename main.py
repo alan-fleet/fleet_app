@@ -2,8 +2,7 @@ import os
 from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 
 app = FastAPI()
 
@@ -21,7 +20,12 @@ engine = create_engine(
     connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
 )
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine
+)
+
 Base = declarative_base()
 
 # =========================
@@ -62,7 +66,7 @@ class Service(Base):
 Base.metadata.create_all(bind=engine)
 
 # =========================
-# HTML
+# HTML BASE
 # =========================
 
 HTML = """
@@ -120,4 +124,117 @@ def home():
         for s in v.services:
             services_html += f"""
             <li>
-                {s.fecha} | {s
+                {s.fecha} | {s.kilometraje} km |
+                {s.tipo_service} |
+                ${s.costo} |
+                {s.observaciones}
+            </li>
+            """
+
+        html_vehicles += f"""
+        <div style="border:1px solid #ccc; padding:15px; margin-bottom:20px; border-radius:10px;">
+
+            <h3>{v.patente} - {v.modelo}</h3>
+
+            <p><strong>KM actuales:</strong> {v.kilometros}</p>
+
+            <h4>🏢 Asignación comercial</h4>
+            <p><strong>Empresa:</strong> {v.empresa_asignada or "-"}</p>
+            <p><strong>Fecha asignación:</strong> {v.fecha_asignacion or "-"}</p>
+            <p><strong>KM asignación:</strong> {v.km_asignacion}</p>
+            <p><strong>Valor mensual:</strong> {v.valor_mensual or "-"}</p>
+
+            <hr>
+
+            <h4>🛠 Registrar service</h4>
+
+            <form method="post" action="/add_service">
+                <input type="hidden" name="vehicle_id" value="{v.id}">
+
+                <p><input name="fecha" placeholder="Fecha" required></p>
+                <p><input name="kilometraje" type="number" placeholder="Kilometraje" required></p>
+                <p><input name="tipo_service" placeholder="Tipo de service" required></p>
+                <p><input name="costo" placeholder="Costo" required></p>
+                <p><input name="observaciones" placeholder="Observaciones"></p>
+
+                <button type="submit">Guardar service</button>
+            </form>
+
+            <h4>📋 Historial de services</h4>
+            <ul>
+                {services_html}
+            </ul>
+
+        </div>
+        """
+
+    db.close()
+    return HTML.format(vehicles=html_vehicles)
+
+# =========================
+# AGREGAR VEHÍCULO
+# =========================
+
+@app.post("/add_vehicle")
+def add_vehicle(
+    patente: str = Form(...),
+    modelo: str = Form(...),
+    kilometros: int = Form(...),
+    empresa_asignada: str = Form(""),
+    fecha_asignacion: str = Form(""),
+    km_asignacion: int = Form(0),
+    valor_mensual: str = Form("")
+):
+    db = SessionLocal()
+
+    nuevo = Vehicle(
+        patente=patente,
+        modelo=modelo,
+        kilometros=kilometros,
+        empresa_asignada=empresa_asignada,
+        fecha_asignacion=fecha_asignacion,
+        km_asignacion=km_asignacion,
+        valor_mensual=valor_mensual
+    )
+
+    db.add(nuevo)
+    db.commit()
+    db.close()
+
+    return RedirectResponse("/", status_code=302)
+
+# =========================
+# AGREGAR SERVICE
+# =========================
+
+@app.post("/add_service")
+def add_service(
+    vehicle_id: int = Form(...),
+    fecha: str = Form(...),
+    kilometraje: int = Form(...),
+    tipo_service: str = Form(...),
+    costo: str = Form(...),
+    observaciones: str = Form("")
+):
+    db = SessionLocal()
+
+    nuevo_service = Service(
+        vehicle_id=vehicle_id,
+        fecha=fecha,
+        kilometraje=kilometraje,
+        tipo_service=tipo_service,
+        costo=costo,
+        observaciones=observaciones
+    )
+
+    db.add(nuevo_service)
+
+    # actualizar KM actual automáticamente
+    vehicle = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
+    if vehicle:
+        vehicle.kilometros = kilometraje
+
+    db.commit()
+    db.close()
+
+    return RedirectResponse("/", status_code=302)
