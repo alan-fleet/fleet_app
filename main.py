@@ -1,3 +1,6 @@
+# main.py completo con vehículos desplegables (<details>)
+# copiar y pegar completo
+
 import os
 from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -77,27 +80,21 @@ Base.metadata.create_all(bind=engine)
 
 def calcular_alerta(vehicle):
 
-    # Si NO tiene services cargados
     if not vehicle.services:
         if vehicle.kilometros >= 14000:
             return "🔴 Service vencido", "#f8d7da"
-
         elif vehicle.kilometros >= 13000:
             return "🟡 Próximo service", "#fff3cd"
-
         else:
             return "🟢 Todo OK", "#d4edda"
 
-    # Si SÍ tiene services cargados
     ultimo_service = max(vehicle.services, key=lambda s: s.kilometraje)
     km_desde_service = vehicle.kilometros - ultimo_service.kilometraje
 
     if km_desde_service >= 14000:
         return "🔴 Service vencido", "#f8d7da"
-
     elif km_desde_service >= 13000:
         return "🟡 Próximo service", "#fff3cd"
-
     else:
         return "🟢 Todo OK", "#d4edda"
 
@@ -112,8 +109,47 @@ HTML = """
 <head>
     <title>FleetUp</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+        body {
+            font-family: Arial;
+            padding: 20px;
+            max-width: 900px;
+            margin: auto;
+        }
+
+        details {
+            margin-bottom: 20px;
+            border-radius: 10px;
+            border: 1px solid #ccc;
+            padding: 10px;
+        }
+
+        summary {
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            list-style: none;
+        }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        button {
+            padding: 8px 12px;
+            margin-top: 5px;
+        }
+
+        input {
+            padding: 8px;
+            width: 100%;
+            max-width: 400px;
+        }
+    </style>
 </head>
-<body style="font-family: Arial; padding: 20px;">
+
+<body>
 
 <h1>🚗 FleetUp</h1>
 
@@ -177,72 +213,70 @@ def home():
             """
 
         html_vehicles += f"""
-        <div style="
-            border:1px solid #ccc;
-            padding:15px;
-            margin-bottom:20px;
-            border-radius:10px;
-            background:{alerta_color};
-        ">
+        <details style="background:{alerta_color};">
 
-            <h3>{v.patente} - {v.modelo}</h3>
+            <summary>
+                {v.patente} - {v.modelo} | {alerta_texto}
+            </summary>
 
-            <h2>{alerta_texto}</h2>
+            <div style="margin-top:15px;">
 
-            <p><strong>KM actuales:</strong> {v.kilometros}</p>
+                <p><strong>KM actuales:</strong> {v.kilometros}</p>
 
-            <h4>🏢 Asignación comercial</h4>
-            <p><strong>Empresa:</strong> {v.empresa_asignada or "-"}</p>
-            <p><strong>Fecha asignación:</strong> {v.fecha_asignacion or "-"}</p>
-            <p><strong>KM asignación:</strong> {v.km_asignacion}</p>
-            <p><strong>Valor mensual:</strong> {v.valor_mensual or "-"}</p>
+                <h4>🏢 Asignación comercial</h4>
+                <p><strong>Empresa:</strong> {v.empresa_asignada or "-"}</p>
+                <p><strong>Fecha asignación:</strong> {v.fecha_asignacion or "-"}</p>
+                <p><strong>KM asignación:</strong> {v.km_asignacion}</p>
+                <p><strong>Valor mensual:</strong> {v.valor_mensual or "-"}</p>
 
-            <form method="post" action="/update_km">
-                <input type="hidden" name="vehicle_id" value="{v.id}">
-                <input name="nuevo_km" type="number" placeholder="Nuevo KM" required>
-                <button type="submit">Actualizar KM</button>
-            </form>
+                <form method="post" action="/update_km">
+                    <input type="hidden" name="vehicle_id" value="{v.id}">
+                    <p><input name="nuevo_km" type="number" placeholder="Nuevo KM" required></p>
+                    <button type="submit">Actualizar KM</button>
+                </form>
 
-            <form method="post" action="/edit_vehicle">
-                <input type="hidden" name="vehicle_id" value="{v.id}">
+                <form method="post" action="/edit_vehicle">
+                    <input type="hidden" name="vehicle_id" value="{v.id}">
 
-                <p><input name="patente" value="{v.patente}" required></p>
-                <p><input name="modelo" value="{v.modelo}" required></p>
-                <p><input name="empresa_asignada" value="{v.empresa_asignada}"></p>
-                <p><input name="fecha_asignacion" value="{v.fecha_asignacion}"></p>
-                <p><input name="km_asignacion" type="number" value="{v.km_asignacion}"></p>
-                <p><input name="valor_mensual" value="{v.valor_mensual}"></p>
+                    <p><input name="patente" value="{v.patente}" required></p>
+                    <p><input name="modelo" value="{v.modelo}" required></p>
+                    <p><input name="empresa_asignada" value="{v.empresa_asignada}"></p>
+                    <p><input name="fecha_asignacion" value="{v.fecha_asignacion}"></p>
+                    <p><input name="km_asignacion" type="number" value="{v.km_asignacion}"></p>
+                    <p><input name="valor_mensual" value="{v.valor_mensual}"></p>
 
-                <button type="submit">✏️ Editar vehículo</button>
-            </form>
+                    <button type="submit">✏️ Editar vehículo</button>
+                </form>
 
-            <form method="post" action="/delete_vehicle">
-                <input type="hidden" name="vehicle_id" value="{v.id}">
-                <button type="submit">🗑 Eliminar vehículo</button>
-            </form>
+                <form method="post" action="/delete_vehicle">
+                    <input type="hidden" name="vehicle_id" value="{v.id}">
+                    <button type="submit">🗑 Eliminar vehículo</button>
+                </form>
 
-            <hr>
+                <hr>
 
-            <h4>🛠 Registrar service</h4>
+                <h4>🛠 Registrar service</h4>
 
-            <form method="post" action="/add_service">
-                <input type="hidden" name="vehicle_id" value="{v.id}">
+                <form method="post" action="/add_service">
+                    <input type="hidden" name="vehicle_id" value="{v.id}">
 
-                <p><input name="fecha" placeholder="Fecha" required></p>
-                <p><input name="kilometraje" type="number" placeholder="Kilometraje" required></p>
-                <p><input name="tipo_service" placeholder="Tipo de service" required></p>
-                <p><input name="costo" placeholder="Costo" required></p>
-                <p><input name="observaciones" placeholder="Observaciones"></p>
+                    <p><input name="fecha" placeholder="Fecha" required></p>
+                    <p><input name="kilometraje" type="number" placeholder="Kilometraje" required></p>
+                    <p><input name="tipo_service" placeholder="Tipo de service" required></p>
+                    <p><input name="costo" placeholder="Costo" required></p>
+                    <p><input name="observaciones" placeholder="Observaciones"></p>
 
-                <button type="submit">Guardar service</button>
-            </form>
+                    <button type="submit">Guardar service</button>
+                </form>
 
-            <h4>📋 Historial de services</h4>
-            <ul>
-                {services_html}
-            </ul>
+                <h4>📋 Historial de services</h4>
+                <ul>
+                    {services_html}
+                </ul>
 
-        </div>
+            </div>
+
+        </details>
         """
 
     db.close()
