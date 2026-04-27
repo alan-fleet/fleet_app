@@ -1,8 +1,8 @@
 # main.py
-# FleetUp + Dashboard Financiero + Gastos por Vehículo
-# versión estable sobre tu base actual + VehicleExpense
+# FleetUp + Dashboard Financiero + Gastos + Vencimientos (FASE 2 SEGURA)
 
 import os
+from datetime import datetime
 from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
@@ -63,12 +63,17 @@ class Vehicle(Base):
         cascade="all, delete-orphan"
     )
 
+    deadlines = relationship(
+        "VehicleDeadline",
+        back_populates="vehicle",
+        cascade="all, delete-orphan"
+    )
+
 
 class Service(Base):
     __tablename__ = "services"
 
     id = Column(Integer, primary_key=True, index=True)
-
     vehicle_id = Column(Integer, ForeignKey("vehicles.id"))
 
     fecha = Column(String)
@@ -87,10 +92,9 @@ class VehicleExpense(Base):
     __tablename__ = "vehicle_expenses"
 
     id = Column(Integer, primary_key=True, index=True)
-
     vehicle_id = Column(Integer, ForeignKey("vehicles.id"))
 
-    categoria = Column(String)  # patente / seguro / vtv / cubiertas / otros
+    categoria = Column(String)
     fecha = Column(String, default="")
     monto = Column(String, default="0")
     observaciones = Column(String, default="")
@@ -98,6 +102,22 @@ class VehicleExpense(Base):
     vehicle = relationship(
         "Vehicle",
         back_populates="expenses"
+    )
+
+
+class VehicleDeadline(Base):
+    __tablename__ = "vehicle_deadlines"
+
+    id = Column(Integer, primary_key=True, index=True)
+    vehicle_id = Column(Integer, ForeignKey("vehicles.id"))
+
+    tipo = Column(String)  # patente / seguro / vtv / cubiertas / service
+    fecha_vencimiento = Column(String, default="")
+    observaciones = Column(String, default="")
+
+    vehicle = relationship(
+        "Vehicle",
+        back_populates="deadlines"
     )
 
 
@@ -133,9 +153,7 @@ def calcular_alerta(vehicle):
         key=lambda s: s.kilometraje
     )
 
-    km_desde_service = (
-        vehicle.kilometros - ultimo_service.kilometraje
-    )
+    km_desde_service = vehicle.kilometros - ultimo_service.kilometraje
 
     if km_desde_service >= 14000:
         return "🔴 Service vencido", "#f8d7da"
@@ -143,6 +161,22 @@ def calcular_alerta(vehicle):
         return "🟡 Próximo service", "#fff3cd"
     else:
         return "🟢 Todo OK", "#d4edda"
+
+
+def alerta_vencimiento(fecha):
+    try:
+        hoy = datetime.today()
+        venc = datetime.strptime(fecha, "%Y-%m-%d")
+        dias = (venc - hoy).days
+
+        if dias < 0:
+            return "🔴 Vencido"
+        elif dias <= 30:
+            return "🟡 Próximo a vencer"
+        else:
+            return "🟢 Vigente"
+    except:
+        return "⚪ Sin fecha válida"
 
 
 # =========================================================
@@ -157,12 +191,7 @@ HTML = """
     <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 
-<body style="
-    font-family: Arial;
-    padding: 20px;
-    max-width: 1000px;
-    margin: auto;
-">
+<body style="font-family: Arial; padding:20px; max-width:1100px; margin:auto;">
 
 <h1>🚗 FleetUp</h1>
 
@@ -178,7 +207,6 @@ HTML = """
     <p><input name="kilometros" type="number" placeholder="KM actuales" required></p>
 
     <h3>🏢 Asignación comercial</h3>
-
     <p><input name="empresa_asignada" placeholder="Empresa asignada"></p>
     <p><input name="fecha_asignacion" placeholder="Fecha asignación"></p>
     <p><input name="km_asignacion" type="number" placeholder="KM asignación"></p>
@@ -205,28 +233,18 @@ HTML = """
 @app.get("/", response_class=HTMLResponse)
 def home():
     db = SessionLocal()
-
     vehicles = db.query(Vehicle).all()
 
     total_ingresos = 0
     total_gastos = 0
-
     html_vehicles = ""
 
     for v in vehicles:
         alerta_texto, alerta_color = calcular_alerta(v)
 
         ingreso_mensual = to_number(v.valor_mensual)
-
-        gasto_services = sum(
-            to_number(s.costo)
-            for s in v.services
-        )
-
-        gasto_extra = sum(
-            to_number(e.monto)
-            for e in v.expenses
-        )
+        gasto_services = sum(to_number(s.costo) for s in v.services)
+        gasto_extra = sum(to_number(e.monto) for e in v.expenses)
 
         gasto_total = gasto_services + gasto_extra
         ganancia = ingreso_mensual - gasto_total
@@ -234,64 +252,30 @@ def home():
         total_ingresos += ingreso_mensual
         total_gastos += gasto_total
 
-        # -------------------------
-        # services html
-        # -------------------------
-
         services_html = ""
-
         for s in v.services:
             services_html += f"""
-            <li>
-                {s.fecha} |
-                {s.kilometraje} km |
-                {s.tipo_service} |
-                ${s.costo} |
-                {s.observaciones}
-
-                <form method="post"
-                      action="/delete_service"
-                      style="display:inline;">
-                    <input type="hidden"
-                           name="service_id"
-                           value="{s.id}">
-                    <button type="submit">
-                        🗑
-                    </button>
-                </form>
-            </li>
+            <li>{s.fecha} | {s.kilometraje} km | {s.tipo_service} | ${s.costo}</li>
             """
-
-        # -------------------------
-        # expenses html
-        # -------------------------
 
         expenses_html = ""
-
         for e in v.expenses:
             expenses_html += f"""
-            <li>
-                {e.categoria} |
-                {e.fecha} |
-                ${e.monto} |
-                {e.observaciones}
-
-                <form method="post"
-                      action="/delete_expense"
-                      style="display:inline;">
-                    <input type="hidden"
-                           name="expense_id"
-                           value="{e.id}">
-                    <button type="submit">
-                        🗑
-                    </button>
-                </form>
-            </li>
+            <li>{e.categoria} | {e.fecha} | ${e.monto} | {e.observaciones}</li>
             """
 
-        # -------------------------
-        # bloque vehicle
-        # -------------------------
+        deadlines_html = ""
+        for d in v.deadlines:
+            estado = alerta_vencimiento(d.fecha_vencimiento)
+
+            deadlines_html += f"""
+            <li>
+                <strong>{d.tipo}</strong> |
+                {d.fecha_vencimiento} |
+                {estado} |
+                {d.observaciones}
+            </li>
+            """
 
         html_vehicles += f"""
         <details style="
@@ -301,10 +285,7 @@ def home():
             padding:15px;
             margin-bottom:20px;
         ">
-            <summary style="
-                cursor:pointer;
-                font-size:18px;
-            ">
+            <summary style="cursor:pointer; font-size:18px;">
                 <strong>{v.patente} - {v.modelo}</strong>
             </summary>
 
@@ -313,97 +294,67 @@ def home():
             <p><strong>KM actuales:</strong> {v.kilometros}</p>
 
             <h3>💰 Dashboard financiero</h3>
-
             <p><strong>Ingreso mensual:</strong> ${ingreso_mensual}</p>
-            <p><strong>Gasto services:</strong> ${gasto_services}</p>
-            <p><strong>Otros gastos:</strong> ${gasto_extra}</p>
             <p><strong>Gasto total:</strong> ${gasto_total}</p>
-            <p><strong>Ganancia estimada:</strong> ${ganancia}</p>
+            <p><strong>Ganancia:</strong> ${ganancia}</p>
 
             <hr>
 
-            <h3>🏢 Asignación comercial</h3>
+            <h3>📅 Vencimientos</h3>
 
-            <p><strong>Empresa:</strong> {v.empresa_asignada or "-"}</p>
-            <p><strong>Fecha asignación:</strong> {v.fecha_asignacion or "-"}</p>
-            <p><strong>KM asignación:</strong> {v.km_asignacion}</p>
-            <p><strong>Valor mensual:</strong> {v.valor_mensual}</p>
-
-            <hr>
-
-            <h4>🛠 Registrar service</h4>
-
-            <form method="post" action="/add_service">
-                <input type="hidden" name="vehicle_id" value="{v.id}">
-
-                <p><input name="fecha" placeholder="Fecha" required></p>
-                <p><input name="kilometraje" type="number" placeholder="Kilometraje" required></p>
-                <p><input name="tipo_service" placeholder="Tipo service" required></p>
-                <p><input name="costo" placeholder="Costo" required></p>
-                <p><input name="observaciones" placeholder="Observaciones"></p>
-
-                <button type="submit">
-                    Guardar service
-                </button>
-            </form>
-
-            <h4>📋 Historial services</h4>
-            <ul>
-                {services_html}
-            </ul>
-
-            <hr>
-
-            <h4>💸 Agregar gasto financiero</h4>
-
-            <form method="post" action="/add_expense">
+            <form method="post" action="/add_deadline">
                 <input type="hidden" name="vehicle_id" value="{v.id}">
 
                 <p>
-                    <select name="categoria" required>
-                        <option value="">Seleccionar categoría</option>
+                    <select name="tipo" required>
+                        <option value="">Seleccionar tipo</option>
                         <option value="Patente">Patente</option>
                         <option value="Seguro">Seguro</option>
                         <option value="VTV/BTV">VTV/BTV</option>
                         <option value="Cubiertas">Cubiertas</option>
-                        <option value="Otros">Otros</option>
+                        <option value="Service programado">Service programado</option>
                     </select>
                 </p>
 
-                <p><input name="fecha" placeholder="Fecha"></p>
-                <p><input name="monto" placeholder="Monto" required></p>
-                <p><input name="observaciones" placeholder="Observaciones"></p>
+                <p>
+                    <input
+                        name="fecha_vencimiento"
+                        type="date"
+                        required
+                    >
+                </p>
+
+                <p>
+                    <input
+                        name="observaciones"
+                        placeholder="Observaciones"
+                    >
+                </p>
 
                 <button type="submit">
-                    Guardar gasto
+                    Guardar vencimiento
                 </button>
             </form>
 
-            <h4>📋 Historial gastos</h4>
+            <h4>Historial vencimientos</h4>
             <ul>
-                {expenses_html}
+                {deadlines_html}
             </ul>
 
             <hr>
 
-            <form method="post" action="/delete_vehicle">
-                <input type="hidden" name="vehicle_id" value="{v.id}">
-                <button type="submit">
-                    🗑 Eliminar vehículo
-                </button>
-            </form>
+            <h4>Historial services</h4>
+            <ul>{services_html}</ul>
+
+            <h4>Historial gastos</h4>
+            <ul>{expenses_html}</ul>
 
         </details>
         """
 
     dashboard_general = f"""
-    <div style="
-        background:#f8f9fa;
-        padding:20px;
-        border-radius:10px;
-    ">
+    <div style="background:#f8f9fa; padding:20px; border-radius:10px;">
         <h2>📊 Resumen General</h2>
-
         <p><strong>Facturación mensual:</strong> ${total_ingresos}</p>
         <p><strong>Gastos totales:</strong> ${total_gastos}</p>
         <p><strong>Ganancia total:</strong> ${total_ingresos - total_gastos}</p>
@@ -451,118 +402,24 @@ def add_vehicle(
     return RedirectResponse("/", status_code=302)
 
 
-@app.post("/add_service")
-def add_service(
+@app.post("/add_deadline")
+def add_deadline(
     vehicle_id: int = Form(...),
-    fecha: str = Form(...),
-    kilometraje: int = Form(...),
-    tipo_service: str = Form(...),
-    costo: str = Form(...),
+    tipo: str = Form(...),
+    fecha_vencimiento: str = Form(...),
     observaciones: str = Form("")
 ):
     db = SessionLocal()
 
-    nuevo = Service(
+    nuevo = VehicleDeadline(
         vehicle_id=vehicle_id,
-        fecha=fecha,
-        kilometraje=kilometraje,
-        tipo_service=tipo_service,
-        costo=costo,
-        observaciones=observaciones
-    )
-
-    db.add(nuevo)
-
-    vehicle = db.query(Vehicle).filter(
-        Vehicle.id == vehicle_id
-    ).first()
-
-    if vehicle:
-        vehicle.kilometros = kilometraje
-
-    db.commit()
-    db.close()
-
-    return RedirectResponse("/", status_code=302)
-
-
-@app.post("/add_expense")
-def add_expense(
-    vehicle_id: int = Form(...),
-    categoria: str = Form(...),
-    fecha: str = Form(""),
-    monto: str = Form(...),
-    observaciones: str = Form("")
-):
-    db = SessionLocal()
-
-    nuevo = VehicleExpense(
-        vehicle_id=vehicle_id,
-        categoria=categoria,
-        fecha=fecha,
-        monto=monto,
+        tipo=tipo,
+        fecha_vencimiento=fecha_vencimiento,
         observaciones=observaciones
     )
 
     db.add(nuevo)
     db.commit()
-    db.close()
-
-    return RedirectResponse("/", status_code=302)
-
-
-@app.post("/delete_service")
-def delete_service(
-    service_id: int = Form(...)
-):
-    db = SessionLocal()
-
-    item = db.query(Service).filter(
-        Service.id == service_id
-    ).first()
-
-    if item:
-        db.delete(item)
-        db.commit()
-
-    db.close()
-
-    return RedirectResponse("/", status_code=302)
-
-
-@app.post("/delete_expense")
-def delete_expense(
-    expense_id: int = Form(...)
-):
-    db = SessionLocal()
-
-    item = db.query(VehicleExpense).filter(
-        VehicleExpense.id == expense_id
-    ).first()
-
-    if item:
-        db.delete(item)
-        db.commit()
-
-    db.close()
-
-    return RedirectResponse("/", status_code=302)
-
-
-@app.post("/delete_vehicle")
-def delete_vehicle(
-    vehicle_id: int = Form(...)
-):
-    db = SessionLocal()
-
-    item = db.query(Vehicle).filter(
-        Vehicle.id == vehicle_id
-    ).first()
-
-    if item:
-        db.delete(item)
-        db.commit()
-
     db.close()
 
     return RedirectResponse("/", status_code=302)
