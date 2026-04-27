@@ -468,3 +468,160 @@ def add_vehicle(
     db.close()
 
     return RedirectResponse("/", status_code=302)
+@app.post("/add_service")
+def add_service(
+    vehicle_id: int = Form(...),
+    fecha: str = Form(...),
+    kilometraje: int = Form(...),
+    tipo_service: str = Form(...),
+    costo: str = Form(...),
+    observaciones: str = Form("")
+):
+    db = SessionLocal()
+
+    nuevo = Service(
+        vehicle_id=vehicle_id,
+        fecha=fecha,
+        kilometraje=kilometraje,
+        tipo_service=tipo_service,
+        costo=costo,
+        observaciones=observaciones
+    )
+
+    db.add(nuevo)
+
+    vehicle = db.query(Vehicle).filter(
+        Vehicle.id == vehicle_id
+    ).first()
+
+    if vehicle:
+        vehicle.kilometros = kilometraje
+
+    db.commit()
+    db.close()
+
+    return RedirectResponse("/", status_code=302)
+
+
+@app.post("/add_expense")
+def add_expense(
+    vehicle_id: int = Form(...),
+    categoria: str = Form(...),
+    fecha: str = Form(""),
+    monto: str = Form(...),
+    observaciones: str = Form("")
+):
+    db = SessionLocal()
+
+    nuevo = VehicleExpense(
+        vehicle_id=vehicle_id,
+        categoria=categoria,
+        fecha=fecha,
+        monto=monto,
+        observaciones=observaciones
+    )
+
+    db.add(nuevo)
+    db.commit()
+    db.close()
+
+    return RedirectResponse("/", status_code=302)
+
+
+@app.post("/add_deadline")
+def add_deadline(
+    vehicle_id: int = Form(...),
+    tipo: str = Form(...),
+    fecha_vencimiento: str = Form(...),
+    observaciones: str = Form("")
+):
+    db = SessionLocal()
+
+    nuevo = VehicleDeadline(
+        vehicle_id=vehicle_id,
+        tipo=tipo,
+        fecha_vencimiento=fecha_vencimiento,
+        observaciones=observaciones
+    )
+
+    db.add(nuevo)
+    db.commit()
+    db.close()
+
+    return RedirectResponse("/", status_code=302)
+
+
+@app.post("/delete_vehicle")
+def delete_vehicle(
+    vehicle_id: int = Form(...)
+):
+    db = SessionLocal()
+
+    item = db.query(Vehicle).filter(
+        Vehicle.id == vehicle_id
+    ).first()
+
+    if item:
+        db.delete(item)
+        db.commit()
+
+    db.close()
+
+    return RedirectResponse("/", status_code=302)
+
+
+@app.post("/delete_service")
+def delete_service(
+    service_id: int = Form(...)
+):
+    db = SessionLocal()
+
+    item = db.query(Service).filter(
+        Service.id == service_id
+    ).first()
+
+    if item:
+        db.delete(item)
+        db.commit()
+
+    db.close()
+
+    return RedirectResponse("/", status_code=302)
+
+
+@app.post("/delete_expense")
+def delete_expense(
+    expense_id: int = Form(...)
+):
+    db = SessionLocal()
+
+    item = db.query(VehicleExpense).filter(
+        VehicleExpense.id == expense_id
+    ).first()
+
+    if item:
+        db.delete(item)
+        db.commit()
+
+    db.close()
+
+    return RedirectResponse("/", status_code=302)
+
+
+@app.post("/delete_deadline")
+def delete_deadline(
+    deadline_id: int = Form(...)
+):
+    db = SessionLocal()
+
+    item = db.query(VehicleDeadline).filter(
+        VehicleDeadline.id == deadline_id
+    ).first()
+
+    if item:
+        db.delete(item)
+        db.commit()
+
+    db.close()
+
+    return RedirectResponse("/", status_code=302)
