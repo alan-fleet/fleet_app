@@ -1,6 +1,6 @@
 # main.py
-# FleetUp + Dashboard Financiero + Gastos Separados por Categoría + Vencimientos
-# FASE 3 REAL - versión segura sobre base estable
+# FleetUp + Dashboard Financiero + Gastos Separados por Categoría + Vencimientos + Desplegables
+# FASE 4 COMPLETA - segura sobre tu base real
 
 import os
 from datetime import datetime
@@ -298,15 +298,31 @@ def home():
                 """
 
             categorias_html += f"""
-            <hr>
+            <details style="
+                margin-bottom:15px;
+                border:1px solid #ddd;
+                border-radius:8px;
+                padding:10px;
+                background:#fafafa;
+            ">
+                <summary style="
+                    cursor:pointer;
+                    font-size:18px;
+                    font-weight:bold;
+                ">
+                    📂 {cat}
+                </summary>
 
-            <h3>{cat}</h3>
+                <h4>💸 Historial de gastos</h4>
+                <ul>
+                    {gastos_html if gastos_html else "<li>Sin registros</li>"}
+                </ul>
 
-            <h4>💸 Historial de gastos</h4>
-            <ul>{gastos_html}</ul>
-
-            <h4>📅 Vencimientos</h4>
-            <ul>{venc_html}</ul>
+                <h4>📅 Vencimientos</h4>
+                <ul>
+                    {venc_html if venc_html else "<li>Sin vencimientos</li>"}
+                </ul>
+            </details>
             """
 
         html_vehicles += f"""
@@ -334,6 +350,7 @@ def home():
             <hr>
 
             <h3>🛠 Registrar service</h3>
+
             <form method="post" action="/add_service">
                 <input type="hidden" name="vehicle_id" value="{v.id}">
                 <p><input name="fecha" placeholder="Fecha" required></p>
@@ -350,6 +367,7 @@ def home():
             <hr>
 
             <h3>💸 Agregar gasto</h3>
+
             <form method="post" action="/add_expense">
                 <input type="hidden" name="vehicle_id" value="{v.id}">
 
@@ -374,6 +392,7 @@ def home():
             <hr>
 
             <h3>📅 Agregar vencimiento</h3>
+
             <form method="post" action="/add_deadline">
                 <input type="hidden" name="vehicle_id" value="{v.id}">
 
@@ -393,6 +412,8 @@ def home():
 
                 <button type="submit">Guardar vencimiento</button>
             </form>
+
+            <hr>
 
             {categorias_html}
 
@@ -414,45 +435,32 @@ def home():
         dashboard_general=dashboard_general,
         vehicles=html_vehicles
     )
-@app.post("/add_expense")
-def add_expense(
-    vehicle_id: int = Form(...),
-    categoria: str = Form(...),
-    fecha: str = Form(""),
-    monto: str = Form(...),
-    observaciones: str = Form("")
+
+
+# =========================================================
+# RUTAS
+# =========================================================
+
+@app.post("/add_vehicle")
+def add_vehicle(
+    patente: str = Form(...),
+    modelo: str = Form(...),
+    kilometros: int = Form(...),
+    empresa_asignada: str = Form(""),
+    fecha_asignacion: str = Form(""),
+    km_asignacion: int = Form(0),
+    valor_mensual: str = Form("0")
 ):
     db = SessionLocal()
 
-    nuevo = VehicleExpense(
-        vehicle_id=vehicle_id,
-        categoria=categoria,
-        fecha=fecha,
-        monto=monto,
-        observaciones=observaciones
-    )
-
-    db.add(nuevo)
-    db.commit()
-    db.close()
-
-    return RedirectResponse("/", status_code=302)
-
-
-@app.post("/add_deadline")
-def add_deadline(
-    vehicle_id: int = Form(...),
-    tipo: str = Form(...),
-    fecha_vencimiento: str = Form(...),
-    observaciones: str = Form("")
-):
-    db = SessionLocal()
-
-    nuevo = VehicleDeadline(
-        vehicle_id=vehicle_id,
-        tipo=tipo,
-        fecha_vencimiento=fecha_vencimiento,
-        observaciones=observaciones
+    nuevo = Vehicle(
+        patente=patente,
+        modelo=modelo,
+        kilometros=kilometros,
+        empresa_asignada=empresa_asignada,
+        fecha_asignacion=fecha_asignacion,
+        km_asignacion=km_asignacion,
+        valor_mensual=valor_mensual
     )
 
     db.add(nuevo)
