@@ -1,5 +1,6 @@
 # main.py
-# FleetUp completo + Dashboard Financiero + Editar + Eliminar + Alertas + Desplegables
+# FleetUp + Dashboard Financiero + Gastos por Vehículo
+# versión estable sobre tu base actual + VehicleExpense
 
 import os
 from fastapi import FastAPI, Form
@@ -9,9 +10,9 @@ from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 
 app = FastAPI()
 
-# =========================
-# BASE DE DATOS
-# =========================
+# =========================================================
+# DATABASE
+# =========================================================
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./vehicles.db")
 
@@ -32,14 +33,15 @@ SessionLocal = sessionmaker(
 Base = declarative_base()
 
 
-# =========================
+# =========================================================
 # MODELOS
-# =========================
+# =========================================================
 
 class Vehicle(Base):
     __tablename__ = "vehicles"
 
     id = Column(Integer, primary_key=True, index=True)
+
     patente = Column(String, unique=True)
     modelo = Column(String)
     kilometros = Column(Integer)
@@ -55,11 +57,18 @@ class Vehicle(Base):
         cascade="all, delete-orphan"
     )
 
+    expenses = relationship(
+        "VehicleExpense",
+        back_populates="vehicle",
+        cascade="all, delete-orphan"
+    )
+
 
 class Service(Base):
     __tablename__ = "services"
 
     id = Column(Integer, primary_key=True, index=True)
+
     vehicle_id = Column(Integer, ForeignKey("vehicles.id"))
 
     fecha = Column(String)
@@ -68,19 +77,46 @@ class Service(Base):
     costo = Column(String, default="0")
     observaciones = Column(String, default="")
 
-    vehicle = relationship("Vehicle", back_populates="services")
+    vehicle = relationship(
+        "Vehicle",
+        back_populates="services"
+    )
+
+
+class VehicleExpense(Base):
+    __tablename__ = "vehicle_expenses"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    vehicle_id = Column(Integer, ForeignKey("vehicles.id"))
+
+    categoria = Column(String)  # patente / seguro / vtv / cubiertas / otros
+    fecha = Column(String, default="")
+    monto = Column(String, default="0")
+    observaciones = Column(String, default="")
+
+    vehicle = relationship(
+        "Vehicle",
+        back_populates="expenses"
+    )
 
 
 Base.metadata.create_all(bind=engine)
 
 
-# =========================
-# FUNCIONES AUXILIARES
-# =========================
+# =========================================================
+# AUXILIARES
+# =========================================================
 
 def to_number(valor):
     try:
-        limpio = str(valor).replace("$", "").replace(".", "").replace(",", "").strip()
+        limpio = (
+            str(valor)
+            .replace("$", "")
+            .replace(".", "")
+            .replace(",", "")
+            .strip()
+        )
         return int(limpio) if limpio else 0
     except:
         return 0
@@ -92,8 +128,14 @@ def calcular_alerta(vehicle):
             return "🟡 Próximo service", "#fff3cd"
         return "🟢 Sin services cargados", "#d4edda"
 
-    ultimo_service = max(vehicle.services, key=lambda s: s.kilometraje)
-    km_desde_service = vehicle.kilometros - ultimo_service.kilometraje
+    ultimo_service = max(
+        vehicle.services,
+        key=lambda s: s.kilometraje
+    )
+
+    km_desde_service = (
+        vehicle.kilometros - ultimo_service.kilometraje
+    )
 
     if km_desde_service >= 14000:
         return "🔴 Service vencido", "#f8d7da"
@@ -103,9 +145,9 @@ def calcular_alerta(vehicle):
         return "🟢 Todo OK", "#d4edda"
 
 
-# =========================
+# =========================================================
 # HTML BASE
-# =========================
+# =========================================================
 
 HTML = """
 <!DOCTYPE html>
@@ -114,7 +156,13 @@ HTML = """
     <title>FleetUp</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-<body style="font-family: Arial; padding: 20px; max-width: 900px; margin: auto;">
+
+<body style="
+    font-family: Arial;
+    padding: 20px;
+    max-width: 1000px;
+    margin: auto;
+">
 
 <h1>🚗 FleetUp</h1>
 
@@ -127,7 +175,7 @@ HTML = """
 <form method="post" action="/add_vehicle">
     <p><input name="patente" placeholder="Patente" required></p>
     <p><input name="modelo" placeholder="Modelo" required></p>
-    <p><input name="kilometros" type="number" placeholder="Kilómetros actuales" required></p>
+    <p><input name="kilometros" type="number" placeholder="KM actuales" required></p>
 
     <h3>🏢 Asignación comercial</h3>
 
@@ -150,45 +198,100 @@ HTML = """
 """
 
 
-# =========================
+# =========================================================
 # HOME
-# =========================
+# =========================================================
 
 @app.get("/", response_class=HTMLResponse)
 def home():
     db = SessionLocal()
+
     vehicles = db.query(Vehicle).all()
 
     total_ingresos = 0
     total_gastos = 0
+
     html_vehicles = ""
 
     for v in vehicles:
         alerta_texto, alerta_color = calcular_alerta(v)
 
         ingreso_mensual = to_number(v.valor_mensual)
-        gasto_services = sum(to_number(s.costo) for s in v.services)
-        ganancia = ingreso_mensual - gasto_services
+
+        gasto_services = sum(
+            to_number(s.costo)
+            for s in v.services
+        )
+
+        gasto_extra = sum(
+            to_number(e.monto)
+            for e in v.expenses
+        )
+
+        gasto_total = gasto_services + gasto_extra
+        ganancia = ingreso_mensual - gasto_total
 
         total_ingresos += ingreso_mensual
-        total_gastos += gasto_services
+        total_gastos += gasto_total
+
+        # -------------------------
+        # services html
+        # -------------------------
 
         services_html = ""
 
         for s in v.services:
             services_html += f"""
             <li>
-                {s.fecha} | {s.kilometraje} km |
+                {s.fecha} |
+                {s.kilometraje} km |
                 {s.tipo_service} |
                 ${s.costo} |
                 {s.observaciones}
 
-                <form method="post" action="/delete_service" style="display:inline;">
-                    <input type="hidden" name="service_id" value="{s.id}">
-                    <button type="submit">🗑 Eliminar service</button>
+                <form method="post"
+                      action="/delete_service"
+                      style="display:inline;">
+                    <input type="hidden"
+                           name="service_id"
+                           value="{s.id}">
+                    <button type="submit">
+                        🗑
+                    </button>
                 </form>
             </li>
             """
+
+        # -------------------------
+        # expenses html
+        # -------------------------
+
+        expenses_html = ""
+
+        for e in v.expenses:
+            expenses_html += f"""
+            <li>
+                {e.categoria} |
+                {e.fecha} |
+                ${e.monto} |
+                {e.observaciones}
+
+                <form method="post"
+                      action="/delete_expense"
+                      style="display:inline;">
+                    <input type="hidden"
+                           name="expense_id"
+                           value="{e.id}">
+                    <button type="submit">
+                        🗑
+                    </button>
+                </form>
+            </li>
+            """
+
+        # -------------------------
+        # bloque vehicle
+        # -------------------------
 
         html_vehicles += f"""
         <details style="
@@ -198,7 +301,10 @@ def home():
             padding:15px;
             margin-bottom:20px;
         ">
-            <summary style="cursor:pointer; font-size:18px;">
+            <summary style="
+                cursor:pointer;
+                font-size:18px;
+            ">
                 <strong>{v.patente} - {v.modelo}</strong>
             </summary>
 
@@ -207,38 +313,21 @@ def home():
             <p><strong>KM actuales:</strong> {v.kilometros}</p>
 
             <h3>💰 Dashboard financiero</h3>
+
             <p><strong>Ingreso mensual:</strong> ${ingreso_mensual}</p>
-            <p><strong>Gasto total services:</strong> ${gasto_services}</p>
+            <p><strong>Gasto services:</strong> ${gasto_services}</p>
+            <p><strong>Otros gastos:</strong> ${gasto_extra}</p>
+            <p><strong>Gasto total:</strong> ${gasto_total}</p>
             <p><strong>Ganancia estimada:</strong> ${ganancia}</p>
 
+            <hr>
+
             <h3>🏢 Asignación comercial</h3>
+
             <p><strong>Empresa:</strong> {v.empresa_asignada or "-"}</p>
             <p><strong>Fecha asignación:</strong> {v.fecha_asignacion or "-"}</p>
             <p><strong>KM asignación:</strong> {v.km_asignacion}</p>
             <p><strong>Valor mensual:</strong> {v.valor_mensual}</p>
-
-            <form method="post" action="/update_km">
-                <input type="hidden" name="vehicle_id" value="{v.id}">
-                <input name="nuevo_km" type="number" placeholder="Nuevo KM" required>
-                <button type="submit">Actualizar KM</button>
-            </form>
-
-            <hr>
-
-            <h4>✏ Editar vehículo</h4>
-
-            <form method="post" action="/edit_vehicle">
-                <input type="hidden" name="vehicle_id" value="{v.id}">
-
-                <p><input name="patente" value="{v.patente}" required></p>
-                <p><input name="modelo" value="{v.modelo}" required></p>
-                <p><input name="empresa_asignada" value="{v.empresa_asignada}"></p>
-                <p><input name="fecha_asignacion" value="{v.fecha_asignacion}"></p>
-                <p><input name="km_asignacion" type="number" value="{v.km_asignacion}"></p>
-                <p><input name="valor_mensual" value="{v.valor_mensual}"></p>
-
-                <button type="submit">Guardar cambios</button>
-            </form>
 
             <hr>
 
@@ -246,34 +335,78 @@ def home():
 
             <form method="post" action="/add_service">
                 <input type="hidden" name="vehicle_id" value="{v.id}">
+
                 <p><input name="fecha" placeholder="Fecha" required></p>
                 <p><input name="kilometraje" type="number" placeholder="Kilometraje" required></p>
-                <p><input name="tipo_service" placeholder="Tipo de service" required></p>
+                <p><input name="tipo_service" placeholder="Tipo service" required></p>
                 <p><input name="costo" placeholder="Costo" required></p>
                 <p><input name="observaciones" placeholder="Observaciones"></p>
 
-                <button type="submit">Guardar service</button>
+                <button type="submit">
+                    Guardar service
+                </button>
             </form>
 
-            <h4>📋 Historial de services</h4>
+            <h4>📋 Historial services</h4>
             <ul>
                 {services_html}
             </ul>
 
+            <hr>
+
+            <h4>💸 Agregar gasto financiero</h4>
+
+            <form method="post" action="/add_expense">
+                <input type="hidden" name="vehicle_id" value="{v.id}">
+
+                <p>
+                    <select name="categoria" required>
+                        <option value="">Seleccionar categoría</option>
+                        <option value="Patente">Patente</option>
+                        <option value="Seguro">Seguro</option>
+                        <option value="VTV/BTV">VTV/BTV</option>
+                        <option value="Cubiertas">Cubiertas</option>
+                        <option value="Otros">Otros</option>
+                    </select>
+                </p>
+
+                <p><input name="fecha" placeholder="Fecha"></p>
+                <p><input name="monto" placeholder="Monto" required></p>
+                <p><input name="observaciones" placeholder="Observaciones"></p>
+
+                <button type="submit">
+                    Guardar gasto
+                </button>
+            </form>
+
+            <h4>📋 Historial gastos</h4>
+            <ul>
+                {expenses_html}
+            </ul>
+
+            <hr>
+
             <form method="post" action="/delete_vehicle">
                 <input type="hidden" name="vehicle_id" value="{v.id}">
-                <button type="submit">🗑 Eliminar vehículo</button>
+                <button type="submit">
+                    🗑 Eliminar vehículo
+                </button>
             </form>
 
         </details>
         """
 
     dashboard_general = f"""
-    <div style="background:#f8f9fa; padding:20px; border-radius:10px;">
+    <div style="
+        background:#f8f9fa;
+        padding:20px;
+        border-radius:10px;
+    ">
         <h2>📊 Resumen General</h2>
-        <p><strong>Facturación mensual total:</strong> ${total_ingresos}</p>
-        <p><strong>Gasto total services:</strong> ${total_gastos}</p>
-        <p><strong>Ganancia total estimada:</strong> ${total_ingresos - total_gastos}</p>
+
+        <p><strong>Facturación mensual:</strong> ${total_ingresos}</p>
+        <p><strong>Gastos totales:</strong> ${total_gastos}</p>
+        <p><strong>Ganancia total:</strong> ${total_ingresos - total_gastos}</p>
     </div>
     """
 
@@ -285,9 +418,9 @@ def home():
     )
 
 
-# =========================
+# =========================================================
 # RUTAS
-# =========================
+# =========================================================
 
 @app.post("/add_vehicle")
 def add_vehicle(
@@ -318,50 +451,6 @@ def add_vehicle(
     return RedirectResponse("/", status_code=302)
 
 
-@app.post("/edit_vehicle")
-def edit_vehicle(
-    vehicle_id: int = Form(...),
-    patente: str = Form(...),
-    modelo: str = Form(...),
-    empresa_asignada: str = Form(""),
-    fecha_asignacion: str = Form(""),
-    km_asignacion: int = Form(0),
-    valor_mensual: str = Form("0")
-):
-    db = SessionLocal()
-
-    vehicle = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
-
-    if vehicle:
-        vehicle.patente = patente
-        vehicle.modelo = modelo
-        vehicle.empresa_asignada = empresa_asignada
-        vehicle.fecha_asignacion = fecha_asignacion
-        vehicle.km_asignacion = km_asignacion
-        vehicle.valor_mensual = valor_mensual
-        db.commit()
-
-    db.close()
-    return RedirectResponse("/", status_code=302)
-
-
-@app.post("/update_km")
-def update_km(
-    vehicle_id: int = Form(...),
-    nuevo_km: int = Form(...)
-):
-    db = SessionLocal()
-
-    vehicle = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
-
-    if vehicle:
-        vehicle.kilometros = nuevo_km
-        db.commit()
-
-    db.close()
-    return RedirectResponse("/", status_code=302)
-
-
 @app.post("/add_service")
 def add_service(
     vehicle_id: int = Form(...),
@@ -373,7 +462,7 @@ def add_service(
 ):
     db = SessionLocal()
 
-    nuevo_service = Service(
+    nuevo = Service(
         vehicle_id=vehicle_id,
         fecha=fecha,
         kilometraje=kilometraje,
@@ -382,13 +471,79 @@ def add_service(
         observaciones=observaciones
     )
 
-    db.add(nuevo_service)
+    db.add(nuevo)
 
-    vehicle = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
+    vehicle = db.query(Vehicle).filter(
+        Vehicle.id == vehicle_id
+    ).first()
+
     if vehicle:
         vehicle.kilometros = kilometraje
 
     db.commit()
+    db.close()
+
+    return RedirectResponse("/", status_code=302)
+
+
+@app.post("/add_expense")
+def add_expense(
+    vehicle_id: int = Form(...),
+    categoria: str = Form(...),
+    fecha: str = Form(""),
+    monto: str = Form(...),
+    observaciones: str = Form("")
+):
+    db = SessionLocal()
+
+    nuevo = VehicleExpense(
+        vehicle_id=vehicle_id,
+        categoria=categoria,
+        fecha=fecha,
+        monto=monto,
+        observaciones=observaciones
+    )
+
+    db.add(nuevo)
+    db.commit()
+    db.close()
+
+    return RedirectResponse("/", status_code=302)
+
+
+@app.post("/delete_service")
+def delete_service(
+    service_id: int = Form(...)
+):
+    db = SessionLocal()
+
+    item = db.query(Service).filter(
+        Service.id == service_id
+    ).first()
+
+    if item:
+        db.delete(item)
+        db.commit()
+
+    db.close()
+
+    return RedirectResponse("/", status_code=302)
+
+
+@app.post("/delete_expense")
+def delete_expense(
+    expense_id: int = Form(...)
+):
+    db = SessionLocal()
+
+    item = db.query(VehicleExpense).filter(
+        VehicleExpense.id == expense_id
+    ).first()
+
+    if item:
+        db.delete(item)
+        db.commit()
+
     db.close()
 
     return RedirectResponse("/", status_code=302)
@@ -400,27 +555,14 @@ def delete_vehicle(
 ):
     db = SessionLocal()
 
-    vehicle = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
+    item = db.query(Vehicle).filter(
+        Vehicle.id == vehicle_id
+    ).first()
 
-    if vehicle:
-        db.delete(vehicle)
+    if item:
+        db.delete(item)
         db.commit()
 
     db.close()
-    return RedirectResponse("/", status_code=302)
 
-
-@app.post("/delete_service")
-def delete_service(
-    service_id: int = Form(...)
-):
-    db = SessionLocal()
-
-    service = db.query(Service).filter(Service.id == service_id).first()
-
-    if service:
-        db.delete(service)
-        db.commit()
-
-    db.close()
     return RedirectResponse("/", status_code=302)
