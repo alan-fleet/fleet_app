@@ -1,10 +1,10 @@
 # main.py
 # FleetUp + Dashboard Financiero + Gastos Separados por Categoria + Vencimientos + Desplegables
-# PASO 2: Edicion de vehiculos
+# PASO 3: Busqueda y filtros
 
 import os
 from datetime import datetime
-from fastapi import FastAPI, Form
+from fastapi import FastAPI, Form, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
@@ -197,6 +197,29 @@ HTML = """
 
 <hr>
 
+<h2>Buscar vehiculos</h2>
+<form method="get" action="/" style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:20px;">
+    <div style="display:grid; grid-template-columns:2fr 1fr auto auto; gap:10px; align-items:end;">
+        <div>
+            <label style="font-size:12px; color:#666;">Buscar por patente o modelo</label>
+            <input name="q" value="{search_query}" placeholder="Ej: ABC123 o Toyota" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+        </div>
+        <div>
+            <label style="font-size:12px; color:#666;">Filtrar por estado</label>
+            <select name="filtro" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                <option value="todos" {sel_todos}>Todos</option>
+                <option value="ok" {sel_ok}>Todo OK</option>
+                <option value="proximo" {sel_proximo}>Proximo service</option>
+                <option value="vencido" {sel_vencido}>Service vencido</option>
+            </select>
+        </div>
+        <button type="submit" style="padding:8px 16px; background:#007bff; color:white; border:none; border-radius:4px; cursor:pointer;">Buscar</button>
+        <a href="/" style="padding:8px 16px; background:#6c757d; color:white; text-decoration:none; border-radius:4px; display:inline-block; text-align:center;">Limpiar</a>
+    </div>
+</form>
+
+<hr>
+
 <h2>Agregar vehiculo</h2>
 
 <form method="post" action="/add_vehicle">
@@ -224,11 +247,14 @@ HTML = """
 """
 
 # =========================================================
-# HOME
+# HOME CON BUSQUEDA Y FILTROS
 # =========================================================
 
 @app.get("/", response_class=HTMLResponse)
-def home():
+def home(
+    q: str = Query(default=""),
+    filtro: str = Query(default="todos")
+):
     db = SessionLocal()
     vehicles = db.query(Vehicle).all()
 
@@ -246,6 +272,12 @@ def home():
 
     for v in vehicles:
         alerta_texto, alerta_color, alerta_tipo = calcular_alerta(v)
+
+        # FILTROS
+        if q and q.lower() not in v.patente.lower() and q.lower() not in v.modelo.lower():
+            continue
+        if filtro != "todos" and alerta_tipo != filtro:
+            continue
 
         ingreso_mensual = to_number(v.valor_mensual)
         gasto_services = sum(to_number(s.costo) for s in v.services)
@@ -412,6 +444,9 @@ def home():
         </details>
         """
 
+    if not html_vehicles:
+        html_vehicles = "<p style='color:#999;'>No se encontraron vehiculos con esos filtros.</p>"
+
     dashboard_general = f"""
     <div style="background:#f8f9fa; padding:20px; border-radius:10px;">
         <h2>Resumen General</h2>
@@ -421,11 +456,22 @@ def home():
     </div>
     """
 
+    # Selected options
+    sel_todos = "selected" if filtro == "todos" else ""
+    sel_ok = "selected" if filtro == "ok" else ""
+    sel_proximo = "selected" if filtro == "proximo" else ""
+    sel_vencido = "selected" if filtro == "vencido" else ""
+
     db.close()
 
     return HTML.format(
         dashboard_general=dashboard_general,
-        vehicles=html_vehicles
+        vehicles=html_vehicles,
+        search_query=q,
+        sel_todos=sel_todos,
+        sel_ok=sel_ok,
+        sel_proximo=sel_proximo,
+        sel_vencido=sel_vencido
     )
 
 # =========================================================
