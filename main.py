@@ -1,9 +1,13 @@
 # main.py
 # FleetUp + Dashboard Financiero + Gastos Separados por Categoria + Vencimientos + Desplegables
-# PASO 3: Busqueda y filtros
+# PASO 4 FINAL: Alertas por email
 
 import os
+import smtplib
 from datetime import datetime
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
 from fastapi import FastAPI, Form, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
@@ -217,6 +221,10 @@ HTML = """
         <a href="/" style="padding:8px 16px; background:#6c757d; color:white; text-decoration:none; border-radius:4px; display:inline-block; text-align:center;">Limpiar</a>
     </div>
 </form>
+
+<div style="text-align:right; margin-bottom:10px;">
+    <a href="/send_alerts" style="padding:8px 16px; background:#28a745; color:white; text-decoration:none; border-radius:4px; display:inline-block;">Enviar alertas por email</a>
+</div>
 
 <hr>
 
@@ -473,6 +481,112 @@ def home(
         sel_proximo=sel_proximo,
         sel_vencido=sel_vencido
     )
+
+# =========================================================
+# ALERTAS POR EMAIL
+# =========================================================
+
+@app.get("/send_alerts", response_class=HTMLResponse)
+def send_alerts_form():
+    html = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Enviar Alertas</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+    </head>
+    <body style="font-family:Arial; padding:20px; max-width:600px; margin:auto;">
+        <h1>Enviar alertas por email</h1>
+        <p style="color:#666;">Se enviara un resumen de vencimientos proximos y services vencidos al email indicado.</p>
+        <p style="color:#666; font-size:14px;">Nota: Configura las variables GMAIL_USER y GMAIL_PASSWORD en Render para que funcione.</p>
+        <form method="post" action="/send_alerts">
+            <p>
+                <label>Email destinatario</label><br>
+                <input name="email_destino" type="email" placeholder="tu@email.com" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+            </p>
+            <p>
+                <button type="submit" style="padding:10px 20px; background:#28a745; color:white; border:none; border-radius:4px; cursor:pointer;">Enviar alerta</button>
+                <a href="/" style="padding:10px 20px; background:#6c757d; color:white; text-decoration:none; border-radius:4px; display:inline-block;">Volver</a>
+            </p>
+        </form>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
+
+
+@app.post("/send_alerts", response_class=HTMLResponse)
+def send_alerts(email_destino: str = Form(...)):
+    GMAIL_USER = os.getenv("GMAIL_USER", "")
+    GMAIL_PASSWORD = os.getenv("GMAIL_PASSWORD", "")
+
+    db = SessionLocal()
+    vehicles = db.query(Vehicle).all()
+    deadlines = db.query(VehicleDeadline).all()
+
+    lineas = ["<h2>FleetUp - Resumen de alertas</h2>"]
+
+    # Services
+    lineas.append("<h3>Estado de services</h3><ul>")
+    for v in vehicles:
+        alerta_texto, _, alerta_tipo = calcular_alerta(v)
+        if alerta_tipo in ("vencido", "proximo"):
+            lineas.append(f"<li>{v.patente} - {v.modelo}: <strong>{alerta_texto}</strong></li>")
+    lineas.append("</ul>")
+
+    # Vencimientos
+    lineas.append("<h3>Vencimientos proximos o vencidos</h3><ul>")
+    for d in deadlines:
+        estado = alerta_vencimiento(d.fecha_vencimiento)
+        if "Vencido" in estado or "Proximo" in estado:
+            v = d.vehicle
+            lineas.append(f"<li>{v.patente if v else '?'} - {d.tipo}: {d.fecha_vencimiento} ({estado})</li>")
+    lineas.append("</ul>")
+
+    db.close()
+
+    cuerpo_html = "\n".join(lineas)
+
+    resultado = ""
+    if not GMAIL_USER or not GMAIL_PASSWORD:
+        resultado = """
+        <div style="background:#fff3cd; padding:15px; border-radius:8px; border:1px solid #ffc107;">
+            <p style="margin:0;"><strong>No estan configuradas las variables de entorno</strong></p>
+            <p style="margin:8px 0 0 0; font-size:14px;">Anda a tu servicio en Render, Environment, y agrega GMAIL_USER y GMAIL_PASSWORD.</p>
+        </div>"""
+    else:
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = "FleetUp - Alertas de vencimientos"
+            msg["From"] = GMAIL_USER
+            msg["To"] = email_destino
+            msg.attach(MIMEText(cuerpo_html, "html"))
+
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+                server.login(GMAIL_USER, GMAIL_PASSWORD)
+                server.sendmail(GMAIL_USER, email_destino, msg.as_string())
+
+            resultado = f'<div style="background:#d4edda; padding:15px; border-radius:8px; border:1px solid #28a745;"><p style="margin:0;">Email enviado correctamente a <strong>{email_destino}</strong></p></div>'
+        except Exception as e:
+            resultado = f'<div style="background:#f8d7da; padding:15px; border-radius:8px; border:1px solid #dc3545;"><p style="margin:0;">Error al enviar: {str(e)}</p></div>'
+
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Resultado</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+    </head>
+    <body style="font-family:Arial; padding:20px; max-width:600px; margin:auto;">
+        <h1>Resultado del envio</h1>
+        {resultado}
+        <p style="margin-top:20px;">
+            <a href="/" style="padding:10px 20px; background:#007bff; color:white; text-decoration:none; border-radius:4px; display:inline-block;">Volver al inicio</a>
+        </p>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
 
 # =========================================================
 # EDITAR VEHICULO
