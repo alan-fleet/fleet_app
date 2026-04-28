@@ -21,14 +21,14 @@ app = FastAPI()
 
 # =========================================================
 
-DATABASE_URL = os.getenv(“DATABASE_URL”, “sqlite:///./vehicles.db”)
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./vehicles.db")
 
-if DATABASE_URL.startswith(“postgres://”):
-DATABASE_URL = DATABASE_URL.replace(“postgres://”, “postgresql://”)
+if DATABASE_URL.startswith("postgres://"):
+DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://")
 
 engine = create_engine(
 DATABASE_URL,
-connect_args={“check_same_thread”: False} if “sqlite” in DATABASE_URL else {}
+connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -41,7 +41,7 @@ Base = declarative_base()
 # =========================================================
 
 class Vehicle(Base):
-**tablename** = “vehicles”
+**tablename** = "vehicles"
 
 ```
 id = Column(Integer, primary_key=True, index=True)
@@ -59,7 +59,7 @@ deadlines = relationship("VehicleDeadline", back_populates="vehicle", cascade="a
 ```
 
 class Service(Base):
-**tablename** = “services”
+**tablename** = "services"
 
 ```
 id = Column(Integer, primary_key=True, index=True)
@@ -74,7 +74,7 @@ vehicle = relationship("Vehicle", back_populates="services")
 ```
 
 class VehicleExpense(Base):
-**tablename** = “vehicle_expenses”
+**tablename** = "vehicle_expenses"
 
 ```
 id = Column(Integer, primary_key=True, index=True)
@@ -88,7 +88,7 @@ vehicle = relationship("Vehicle", back_populates="expenses")
 ```
 
 class VehicleDeadline(Base):
-**tablename** = “vehicle_deadlines”
+**tablename** = "vehicle_deadlines"
 
 ```
 id = Column(Integer, primary_key=True, index=True)
@@ -110,7 +110,7 @@ Base.metadata.create_all(bind=engine)
 
 def to_number(valor):
 try:
-limpio = str(valor).replace(”$”, “”).replace(”.”, “”).replace(”,”, “”).strip()
+limpio = str(valor).replace("$", "").replace(".", "").replace(",", "").strip()
 return int(limpio) if limpio else 0
 except:
 return 0
@@ -118,8 +118,8 @@ return 0
 def calcular_alerta(vehicle):
 if not vehicle.services:
 if vehicle.kilometros >= 13000:
-return “🟡 Próximo service”, “#fff3cd”, “proximo”
-return “🟢 Sin services cargados”, “#d4edda”, “ok”
+return "🟡 Próximo service", "#fff3cd", "proximo"
+return "🟢 Sin services cargados", "#d4edda", "ok"
 
 ```
 ultimo_service = max(vehicle.services, key=lambda s: s.kilometraje)
@@ -136,16 +136,16 @@ else:
 def alerta_vencimiento(fecha):
 try:
 hoy = datetime.today()
-venc = datetime.strptime(fecha, “%Y-%m-%d”)
+venc = datetime.strptime(fecha, "%Y-%m-%d")
 dias = (venc - hoy).days
 if dias < 0:
-return “🔴 Vencido”
+return "🔴 Vencido"
 elif dias <= 30:
-return “🟡 Próximo a vencer”
+return "🟡 Próximo a vencer"
 else:
-return “🟢 Vigente”
+return "🟢 Vigente"
 except:
-return “⚪ Sin fecha válida”
+return "⚪ Sin fecha válida"
 
 def filtrar_categoria(items, nombre):
 return [x for x in items if x.categoria == nombre]
@@ -159,7 +159,7 @@ return [x for x in items if x.tipo == nombre]
 
 # =========================================================
 
-ESTILOS = “””
+ESTILOS = """
 
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500&display=swap');
@@ -449,7 +449,7 @@ ESTILOS = “””
   .empty { color: var(--muted); font-size: 14px; padding: 12px 0; }
 </style>
 
-“””
+"""
 
 # =========================================================
 
@@ -457,22 +457,22 @@ ESTILOS = “””
 
 # =========================================================
 
-def nav(active=“vehiculos”):
+def nav(active="vehiculos"):
 links = [
-(“vehiculos”, “/”, “🚗 Vehículos”),
-(“dashboard”, “/dashboard”, “📊 Dashboard”),
-(“vencimientos”, “/vencimientos”, “📅 Vencimientos”),
-(“alertas”, “/send_alerts”, “🔔 Enviar alertas”),
+("vehiculos", "/", "🚗 Vehículos"),
+("dashboard", "/dashboard", "📊 Dashboard"),
+("vencimientos", "/vencimientos", "📅 Vencimientos"),
+("alertas", "/send_alerts", "🔔 Enviar alertas"),
 ]
 html = ‘<nav><a class="nav-brand" href="/">⚡ FleetUp</a><div class="nav-links">’
 for key, href, label in links:
-cls = “nav-link active” if active == key else “nav-link”
+cls = "nav-link active" if active == key else "nav-link"
 html += f’<a class="{cls}" href="{href}">{label}</a>’
-html += “</div></nav>”
+html += "</div></nav>"
 return html
 
-def page(content, active=“vehiculos”):
-return f”””<!DOCTYPE html>
+def page(content, active="vehiculos"):
+return f"""<!DOCTYPE html>
 
 <html lang="es">
 <head>
@@ -490,18 +490,18 @@ return f”””<!DOCTYPE html>
 </html>"""
 
 def badge_alerta(estado):
-if “🔴” in estado:
+if "🔴" in estado:
 return f’<span class="badge badge-danger">{estado}</span>’
-elif “🟡” in estado:
+elif "🟡" in estado:
 return f’<span class="badge badge-warn">{estado}</span>’
 return f’<span class="badge badge-ok">{estado}</span>’
 
 def card_class(tipo):
-if tipo == “vencido”:
-return “card card-danger”
-elif tipo == “proximo”:
-return “card card-warn”
-return “card card-ok”
+if tipo == "vencido":
+return "card card-danger"
+elif tipo == "proximo":
+return "card card-warn"
+return "card card-ok"
 
 # =========================================================
 
@@ -509,10 +509,10 @@ return “card card-ok”
 
 # =========================================================
 
-@app.get(”/”, response_class=HTMLResponse)
+@app.get("/", response_class=HTMLResponse)
 def home(
-q: str = Query(default=””),
-filtro: str = Query(default=“todos”)
+q: str = Query(default=""),
+filtro: str = Query(default="todos")
 ):
 db = SessionLocal()
 vehicles = db.query(Vehicle).all()
@@ -752,7 +752,7 @@ return page(content, active="vehiculos")
 
 # =========================================================
 
-@app.get(”/dashboard”, response_class=HTMLResponse)
+@app.get("/dashboard", response_class=HTMLResponse)
 def dashboard():
 db = SessionLocal()
 vehicles = db.query(Vehicle).all()
@@ -838,7 +838,7 @@ return page(content, active="dashboard")
 
 # =========================================================
 
-@app.get(”/vencimientos”, response_class=HTMLResponse)
+@app.get("/vencimientos", response_class=HTMLResponse)
 def vencimientos():
 db = SessionLocal()
 deadlines = db.query(VehicleDeadline).all()
@@ -901,9 +901,9 @@ return page(content, active="vencimientos")
 
 # =========================================================
 
-@app.get(”/send_alerts”, response_class=HTMLResponse)
+@app.get("/send_alerts", response_class=HTMLResponse)
 def send_alerts_form():
-content = “””
+content = """
 <h1>🔔 Enviar alertas por email</h1>
 <div class="card">
 <p style="color:var(--muted); margin-bottom:20px;">
@@ -915,13 +915,13 @@ Se enviará un resumen de vencimientos próximos y services vencidos al email in
 <div class="btn-row"><button class="btn btn-primary" type="submit">📨 Enviar alerta</button></div>
 </form>
 </div>
-“””
-return page(content, active=“alertas”)
+"""
+return page(content, active="alertas")
 
-@app.post(”/send_alerts”, response_class=HTMLResponse)
+@app.post("/send_alerts", response_class=HTMLResponse)
 def send_alerts(email_destino: str = Form(…)):
-GMAIL_USER = os.getenv(“GMAIL_USER”, “”)
-GMAIL_PASSWORD = os.getenv(“GMAIL_PASSWORD”, “”)
+GMAIL_USER = os.getenv("GMAIL_USER", "")
+GMAIL_PASSWORD = os.getenv("GMAIL_PASSWORD", "")
 
 ```
 db = SessionLocal()
@@ -988,7 +988,7 @@ return page(content, active="alertas")
 
 # =========================================================
 
-@app.get(”/edit_vehicle/{vehicle_id}”, response_class=HTMLResponse)
+@app.get("/edit_vehicle/{vehicle_id}", response_class=HTMLResponse)
 def edit_vehicle_form(vehicle_id: int):
 db = SessionLocal()
 v = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
@@ -1025,16 +1025,16 @@ content = f"""
 return page(content)
 ```
 
-@app.post(”/edit_vehicle/{vehicle_id}”)
+@app.post("/edit_vehicle/{vehicle_id}")
 def edit_vehicle(
 vehicle_id: int,
 patente: str = Form(…),
 modelo: str = Form(…),
 kilometros: int = Form(…),
-empresa_asignada: str = Form(””),
-fecha_asignacion: str = Form(””),
+empresa_asignada: str = Form(""),
+fecha_asignacion: str = Form(""),
 km_asignacion: int = Form(0),
-valor_mensual: str = Form(“0”)
+valor_mensual: str = Form("0")
 ):
 db = SessionLocal()
 v = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
@@ -1048,7 +1048,7 @@ v.km_asignacion = km_asignacion
 v.valor_mensual = valor_mensual
 db.commit()
 db.close()
-return RedirectResponse(”/”, status_code=302)
+return RedirectResponse("/", status_code=302)
 
 # =========================================================
 
@@ -1056,7 +1056,7 @@ return RedirectResponse(”/”, status_code=302)
 
 # =========================================================
 
-@app.get(”/edit_service/{service_id}”, response_class=HTMLResponse)
+@app.get("/edit_service/{service_id}", response_class=HTMLResponse)
 def edit_service_form(service_id: int):
 db = SessionLocal()
 s = db.query(Service).filter(Service.id == service_id).first()
@@ -1088,14 +1088,14 @@ content = f"""
 return page(content)
 ```
 
-@app.post(”/edit_service/{service_id}”)
+@app.post("/edit_service/{service_id}")
 def edit_service(
 service_id: int,
 fecha: str = Form(…),
 kilometraje: int = Form(…),
 tipo_service: str = Form(…),
 costo: str = Form(…),
-observaciones: str = Form(””)
+observaciones: str = Form("")
 ):
 db = SessionLocal()
 s = db.query(Service).filter(Service.id == service_id).first()
@@ -1107,7 +1107,7 @@ s.costo = costo
 s.observaciones = observaciones
 db.commit()
 db.close()
-return RedirectResponse(”/”, status_code=302)
+return RedirectResponse("/", status_code=302)
 
 # =========================================================
 
@@ -1115,7 +1115,7 @@ return RedirectResponse(”/”, status_code=302)
 
 # =========================================================
 
-@app.get(”/edit_expense/{expense_id}”, response_class=HTMLResponse)
+@app.get("/edit_expense/{expense_id}", response_class=HTMLResponse)
 def edit_expense_form(expense_id: int):
 db = SessionLocal()
 g = db.query(VehicleExpense).filter(VehicleExpense.id == expense_id).first()
@@ -1155,13 +1155,13 @@ content = f"""
 return page(content)
 ```
 
-@app.post(”/edit_expense/{expense_id}”)
+@app.post("/edit_expense/{expense_id}")
 def edit_expense(
 expense_id: int,
 categoria: str = Form(…),
-fecha: str = Form(””),
+fecha: str = Form(""),
 monto: str = Form(…),
-observaciones: str = Form(””)
+observaciones: str = Form("")
 ):
 db = SessionLocal()
 g = db.query(VehicleExpense).filter(VehicleExpense.id == expense_id).first()
@@ -1172,7 +1172,7 @@ g.monto = monto
 g.observaciones = observaciones
 db.commit()
 db.close()
-return RedirectResponse(”/”, status_code=302)
+return RedirectResponse("/", status_code=302)
 
 # =========================================================
 
@@ -1180,7 +1180,7 @@ return RedirectResponse(”/”, status_code=302)
 
 # =========================================================
 
-@app.get(”/edit_deadline/{deadline_id}”, response_class=HTMLResponse)
+@app.get("/edit_deadline/{deadline_id}", response_class=HTMLResponse)
 def edit_deadline_form(deadline_id: int):
 db = SessionLocal()
 d = db.query(VehicleDeadline).filter(VehicleDeadline.id == deadline_id).first()
@@ -1217,12 +1217,12 @@ content = f"""
 return page(content)
 ```
 
-@app.post(”/edit_deadline/{deadline_id}”)
+@app.post("/edit_deadline/{deadline_id}")
 def edit_deadline(
 deadline_id: int,
 tipo: str = Form(…),
 fecha_vencimiento: str = Form(…),
-observaciones: str = Form(””)
+observaciones: str = Form("")
 ):
 db = SessionLocal()
 d = db.query(VehicleDeadline).filter(VehicleDeadline.id == deadline_id).first()
@@ -1232,7 +1232,7 @@ d.fecha_vencimiento = fecha_vencimiento
 d.observaciones = observaciones
 db.commit()
 db.close()
-return RedirectResponse(”/”, status_code=302)
+return RedirectResponse("/", status_code=302)
 
 # =========================================================
 
@@ -1240,15 +1240,15 @@ return RedirectResponse(”/”, status_code=302)
 
 # =========================================================
 
-@app.post(”/add_vehicle”)
+@app.post("/add_vehicle")
 def add_vehicle(
 patente: str = Form(…),
 modelo: str = Form(…),
 kilometros: int = Form(…),
-empresa_asignada: str = Form(””),
-fecha_asignacion: str = Form(””),
+empresa_asignada: str = Form(""),
+fecha_asignacion: str = Form(""),
 km_asignacion: int = Form(0),
-valor_mensual: str = Form(“0”)
+valor_mensual: str = Form("0")
 ):
 db = SessionLocal()
 db.add(Vehicle(
@@ -1258,16 +1258,16 @@ km_asignacion=km_asignacion, valor_mensual=valor_mensual
 ))
 db.commit()
 db.close()
-return RedirectResponse(”/”, status_code=302)
+return RedirectResponse("/", status_code=302)
 
-@app.post(”/add_service”)
+@app.post("/add_service")
 def add_service(
 vehicle_id: int = Form(…),
 fecha: str = Form(…),
 kilometraje: int = Form(…),
 tipo_service: str = Form(…),
 costo: str = Form(…),
-observaciones: str = Form(””)
+observaciones: str = Form("")
 ):
 db = SessionLocal()
 db.add(Service(vehicle_id=vehicle_id, fecha=fecha, kilometraje=kilometraje,
@@ -1277,38 +1277,38 @@ if v:
 v.kilometros = kilometraje
 db.commit()
 db.close()
-return RedirectResponse(”/”, status_code=302)
+return RedirectResponse("/", status_code=302)
 
-@app.post(”/add_expense”)
+@app.post("/add_expense")
 def add_expense(
 vehicle_id: int = Form(…),
 categoria: str = Form(…),
-fecha: str = Form(””),
+fecha: str = Form(""),
 monto: str = Form(…),
-observaciones: str = Form(””)
+observaciones: str = Form("")
 ):
 db = SessionLocal()
 db.add(VehicleExpense(vehicle_id=vehicle_id, categoria=categoria,
 fecha=fecha, monto=monto, observaciones=observaciones))
 db.commit()
 db.close()
-return RedirectResponse(”/”, status_code=302)
+return RedirectResponse("/", status_code=302)
 
-@app.post(”/add_deadline”)
+@app.post("/add_deadline")
 def add_deadline(
 vehicle_id: int = Form(…),
 tipo: str = Form(…),
 fecha_vencimiento: str = Form(…),
-observaciones: str = Form(””)
+observaciones: str = Form("")
 ):
 db = SessionLocal()
 db.add(VehicleDeadline(vehicle_id=vehicle_id, tipo=tipo,
 fecha_vencimiento=fecha_vencimiento, observaciones=observaciones))
 db.commit()
 db.close()
-return RedirectResponse(”/”, status_code=302)
+return RedirectResponse("/", status_code=302)
 
-@app.post(”/delete_vehicle”)
+@app.post("/delete_vehicle")
 def delete_vehicle(vehicle_id: int = Form(…)):
 db = SessionLocal()
 item = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
@@ -1316,9 +1316,9 @@ if item:
 db.delete(item)
 db.commit()
 db.close()
-return RedirectResponse(”/”, status_code=302)
+return RedirectResponse("/", status_code=302)
 
-@app.post(”/delete_service”)
+@app.post("/delete_service")
 def delete_service(service_id: int = Form(…)):
 db = SessionLocal()
 item = db.query(Service).filter(Service.id == service_id).first()
@@ -1326,9 +1326,9 @@ if item:
 db.delete(item)
 db.commit()
 db.close()
-return RedirectResponse(”/”, status_code=302)
+return RedirectResponse("/", status_code=302)
 
-@app.post(”/delete_expense”)
+@app.post("/delete_expense")
 def delete_expense(expense_id: int = Form(…)):
 db = SessionLocal()
 item = db.query(VehicleExpense).filter(VehicleExpense.id == expense_id).first()
@@ -1336,9 +1336,9 @@ if item:
 db.delete(item)
 db.commit()
 db.close()
-return RedirectResponse(”/”, status_code=302)
+return RedirectResponse("/", status_code=302)
 
-@app.post(”/delete_deadline”)
+@app.post("/delete_deadline")
 def delete_deadline(deadline_id: int = Form(…)):
 db = SessionLocal()
 item = db.query(VehicleDeadline).filter(VehicleDeadline.id == deadline_id).first()
@@ -1346,4 +1346,4 @@ if item:
 db.delete(item)
 db.commit()
 db.close()
-return RedirectResponse(”/”, status_code=302)
+return RedirectResponse("/", status_code=302)
