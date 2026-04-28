@@ -919,7 +919,7 @@ Se enviará un resumen de vencimientos próximos y services vencidos al email in
 return page(content, active="alertas")
 
 @app.post("/send_alerts", response_class=HTMLResponse)
-def send_alerts(email_destino: str = Form(…)):
+def send_alerts(email_destino: str = Form(...)):
 GMAIL_USER = os.getenv("GMAIL_USER", "")
 GMAIL_PASSWORD = os.getenv("GMAIL_PASSWORD", "")
 
@@ -1028,9 +1028,9 @@ return page(content)
 @app.post("/edit_vehicle/{vehicle_id}")
 def edit_vehicle(
 vehicle_id: int,
-patente: str = Form(…),
-modelo: str = Form(…),
-kilometros: int = Form(…),
+patente: str = Form(...),
+modelo: str = Form(...),
+kilometros: int = Form(...),
 empresa_asignada: str = Form(""),
 fecha_asignacion: str = Form(""),
 km_asignacion: int = Form(0),
@@ -1091,10 +1091,10 @@ return page(content)
 @app.post("/edit_service/{service_id}")
 def edit_service(
 service_id: int,
-fecha: str = Form(…),
-kilometraje: int = Form(…),
-tipo_service: str = Form(…),
-costo: str = Form(…),
+fecha: str = Form(...),
+kilometraje: int = Form(...),
+tipo_service: str = Form(...),
+costo: str = Form(...),
 observaciones: str = Form("")
 ):
 db = SessionLocal()
@@ -1158,9 +1158,9 @@ return page(content)
 @app.post("/edit_expense/{expense_id}")
 def edit_expense(
 expense_id: int,
-categoria: str = Form(…),
+categoria: str = Form(...),
 fecha: str = Form(""),
-monto: str = Form(…),
+monto: str = Form(...),
 observaciones: str = Form("")
 ):
 db = SessionLocal()
@@ -1220,8 +1220,8 @@ return page(content)
 @app.post("/edit_deadline/{deadline_id}")
 def edit_deadline(
 deadline_id: int,
-tipo: str = Form(…),
-fecha_vencimiento: str = Form(…),
+tipo: str = Form(...),
+fecha_vencimiento: str = Form(...),
 observaciones: str = Form("")
 ):
 db = SessionLocal()
@@ -1242,9 +1242,9 @@ return RedirectResponse("/", status_code=302)
 
 @app.post("/add_vehicle")
 def add_vehicle(
-patente: str = Form(…),
-modelo: str = Form(…),
-kilometros: int = Form(…),
+patente: str = Form(...),
+modelo: str = Form(...),
+kilometros: int = Form(...),
 empresa_asignada: str = Form(""),
 fecha_asignacion: str = Form(""),
 km_asignacion: int = Form(0),
@@ -1262,11 +1262,11 @@ return RedirectResponse("/", status_code=302)
 
 @app.post("/add_service")
 def add_service(
-vehicle_id: int = Form(…),
-fecha: str = Form(…),
-kilometraje: int = Form(…),
-tipo_service: str = Form(…),
-costo: str = Form(…),
+vehicle_id: int = Form(...),
+fecha: str = Form(...),
+kilometraje: int = Form(...),
+tipo_service: str = Form(...),
+costo: str = Form(...),
 observaciones: str = Form("")
 ):
 db = SessionLocal()
@@ -1281,10 +1281,10 @@ return RedirectResponse("/", status_code=302)
 
 @app.post("/add_expense")
 def add_expense(
-vehicle_id: int = Form(…),
-categoria: str = Form(…),
+vehicle_id: int = Form(...),
+categoria: str = Form(...),
 fecha: str = Form(""),
-monto: str = Form(…),
+monto: str = Form(...),
 observaciones: str = Form("")
 ):
 db = SessionLocal()
@@ -1296,9 +1296,9 @@ return RedirectResponse("/", status_code=302)
 
 @app.post("/add_deadline")
 def add_deadline(
-vehicle_id: int = Form(…),
-tipo: str = Form(…),
-fecha_vencimiento: str = Form(…),
+vehicle_id: int = Form(...),
+tipo: str = Form(...),
+fecha_vencimiento: str = Form(...),
 observaciones: str = Form("")
 ):
 db = SessionLocal()
@@ -1309,7 +1309,7 @@ db.close()
 return RedirectResponse("/", status_code=302)
 
 @app.post("/delete_vehicle")
-def delete_vehicle(vehicle_id: int = Form(…)):
+def delete_vehicle(vehicle_id: int = Form(...)):
 db = SessionLocal()
 item = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
 if item:
@@ -1319,7 +1319,7 @@ db.close()
 return RedirectResponse("/", status_code=302)
 
 @app.post("/delete_service")
-def delete_service(service_id: int = Form(…)):
+def delete_service(service_id: int = Form(...)):
 db = SessionLocal()
 item = db.query(Service).filter(Service.id == service_id).first()
 if item:
@@ -1329,7 +1329,7 @@ db.close()
 return RedirectResponse("/", status_code=302)
 
 @app.post("/delete_expense")
-def delete_expense(expense_id: int = Form(…)):
+def delete_expense(expense_id: int = Form(...)):
 db = SessionLocal()
 item = db.query(VehicleExpense).filter(VehicleExpense.id == expense_id).first()
 if item:
@@ -1339,7 +1339,7 @@ db.close()
 return RedirectResponse("/", status_code=302)
 
 @app.post("/delete_deadline")
-def delete_deadline(deadline_id: int = Form(…)):
+def delete_deadline(deadline_id: int = Form(...)):
 db = SessionLocal()
 item = db.query(VehicleDeadline).filter(VehicleDeadline.id == deadline_id).first()
 if item:
