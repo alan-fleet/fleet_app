@@ -139,8 +139,8 @@ def to_number(valor):
 def calcular_alerta(vehicle):
     if not vehicle.services:
         if vehicle.kilometros >= 13000:
-            return "Proximo service", "#fff3cd"
-        return "Sin services cargados", "#d4edda"
+            return "Proximo service", "#fff3cd", "proximo"
+        return "Sin services cargados", "#d4edda", "ok"
 
     ultimo_service = max(
         vehicle.services,
@@ -150,11 +150,11 @@ def calcular_alerta(vehicle):
     km_desde_service = vehicle.kilometros - ultimo_service.kilometraje
 
     if km_desde_service >= 14000:
-        return "Service vencido", "#f8d7da"
+        return "Service vencido", "#f8d7da", "vencido"
     elif km_desde_service >= 13000:
-        return "Proximo service", "#fff3cd"
+        return "Proximo service", "#fff3cd", "proximo"
     else:
-        return "Todo OK", "#d4edda"
+        return "Todo OK", "#d4edda", "ok"
 
 def alerta_vencimiento(fecha):
     try:
@@ -245,7 +245,7 @@ def home():
     ]
 
     for v in vehicles:
-        alerta_texto, alerta_color = calcular_alerta(v)
+        alerta_texto, alerta_color, alerta_tipo = calcular_alerta(v)
 
         ingreso_mensual = to_number(v.valor_mensual)
         gasto_services = sum(to_number(s.costo) for s in v.services)
