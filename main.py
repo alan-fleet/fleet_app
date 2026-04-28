@@ -1,6 +1,6 @@
 # main.py
-# FleetUp - Diseno moderno mejorado
-# PASO 5: UI moderna con dark theme
+# FleetUp - Version completa con todas las funcionalidades
+# PASO 6 FINAL: Eliminar vehiculo + Edicion completa + Dashboard
 
 import os
 from datetime import datetime
@@ -227,6 +227,52 @@ body::before {
     z-index: 1;
 }
 
+/* NAV */
+.nav {
+    background: var(--bg-card);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    height: 64px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(20px);
+    background: rgba(26, 29, 41, 0.8);
+}
+
+.nav-brand {
+    font-size: 24px;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), #00a8cc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-decoration: none;
+}
+
+.nav-links {
+    display: flex;
+    gap: 8px;
+}
+
+.nav-link {
+    color: var(--text-secondary);
+    text-decoration: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.3s;
+}
+
+.nav-link:hover, .nav-link.active {
+    background: rgba(0, 217, 255, 0.1);
+    color: var(--accent);
+}
+
 h1 {
     font-size: 48px;
     font-weight: 800;
@@ -401,9 +447,20 @@ h1 {
     color: white;
 }
 
+.btn-danger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px var(--danger-glow);
+}
+
 .btn-sm {
     padding: 6px 12px;
     font-size: 12px;
+}
+
+.btn-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
 /* FORMS */
@@ -420,6 +477,12 @@ h1 {
     grid-template-columns: 2fr 1fr auto auto;
     gap: 12px;
     align-items: end;
+}
+
+.form-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
 }
 
 label {
@@ -622,8 +685,104 @@ tr:hover td {
     margin-bottom: 16px;
     opacity: 0.3;
 }
+
+/* ADD VEHICLE MODAL */
+.modal-trigger {
+    position: fixed;
+    bottom: 32px;
+    right: 32px;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, var(--accent), #00a8cc);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: #000;
+    cursor: pointer;
+    box-shadow: 0 8px 24px var(--accent-glow);
+    transition: all 0.3s;
+    z-index: 50;
+    border: none;
+    font-weight: 800;
+}
+
+.modal-trigger:hover {
+    transform: scale(1.1) rotate(90deg);
+    box-shadow: 0 12px 32px var(--accent-glow);
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(10px);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    max-width: 600px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 32px;
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 24px;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    transition: all 0.3s;
+}
+
+.modal-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
 </style>
 """
+
+# =========================================================
+# NAV COMPONENT
+# =========================================================
+
+def nav_component(active="vehiculos"):
+    return f"""
+    <div class="nav">
+        <a class="nav-brand" href="/">FleetUp</a>
+        <div class="nav-links">
+            <a class="nav-link {'active' if active == 'vehiculos' else ''}" href="/">Vehiculos</a>
+            <a class="nav-link {'active' if active == 'dashboard' else ''}" href="/dashboard">Dashboard</a>
+        </div>
+    </div>
+    """
 
 # =========================================================
 # HOME
@@ -669,6 +828,15 @@ def home(
                 <td>{s.tipo_service}</td>
                 <td>${to_number(s.costo):,}</td>
                 <td style="font-family: 'Outfit', sans-serif;">{s.observaciones}</td>
+                <td>
+                    <div class="btn-group">
+                        <a href="/edit_service/{s.id}" class="btn btn-secondary btn-sm">✏️</a>
+                        <form method="post" action="/delete_service" style="display:inline;">
+                            <input type="hidden" name="service_id" value="{s.id}">
+                            <button class="btn btn-danger btn-sm" onclick="return confirm('¿Eliminar service?')">🗑️</button>
+                        </form>
+                    </div>
+                </td>
             </tr>"""
 
         categorias_html = ""
@@ -683,6 +851,15 @@ def home(
                     <td>{g.fecha}</td>
                     <td>${to_number(g.monto):,}</td>
                     <td style="font-family: 'Outfit', sans-serif;">{g.observaciones}</td>
+                    <td>
+                        <div class="btn-group">
+                            <a href="/edit_expense/{g.id}" class="btn btn-secondary btn-sm">✏️</a>
+                            <form method="post" action="/delete_expense" style="display:inline;">
+                                <input type="hidden" name="expense_id" value="{g.id}">
+                                <button class="btn btn-danger btn-sm" onclick="return confirm('¿Eliminar gasto?')">🗑️</button>
+                            </form>
+                        </div>
+                    </td>
                 </tr>"""
 
             venc_rows = ""
@@ -694,6 +871,15 @@ def home(
                     <td>{d.fecha_vencimiento}</td>
                     <td><span class="badge {badge_class}">{estado_text}</span></td>
                     <td style="font-family: 'Outfit', sans-serif;">{d.observaciones}</td>
+                    <td>
+                        <div class="btn-group">
+                            <a href="/edit_deadline/{d.id}" class="btn btn-secondary btn-sm">✏️</a>
+                            <form method="post" action="/delete_deadline" style="display:inline;">
+                                <input type="hidden" name="deadline_id" value="{d.id}">
+                                <button class="btn btn-danger btn-sm" onclick="return confirm('¿Eliminar vencimiento?')">🗑️</button>
+                            </form>
+                        </div>
+                    </td>
                 </tr>"""
 
             categorias_html += f"""
@@ -701,12 +887,12 @@ def home(
                 <div class="section-title">{cat}</div>
                 <div class="card">
                     <h4 style="margin-bottom:12px; font-size:12px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:1px;">Gastos</h4>
-                    {'<table><thead><tr><th>Fecha</th><th>Monto</th><th>Obs.</th></tr></thead><tbody>' + gastos_rows + '</tbody></table>' if gastos_rows else '<div class="empty-state"><div class="empty-state-icon">💸</div><p>Sin gastos registrados</p></div>'}
+                    {'<table><thead><tr><th>Fecha</th><th>Monto</th><th>Obs.</th><th></th></tr></thead><tbody>' + gastos_rows + '</tbody></table>' if gastos_rows else '<div class="empty-state"><div class="empty-state-icon">💸</div><p>Sin gastos</p></div>'}
                     
                     <div class="divider"></div>
                     
                     <h4 style="margin-bottom:12px; font-size:12px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:1px;">Vencimientos</h4>
-                    {'<table><thead><tr><th>Fecha</th><th>Estado</th><th>Obs.</th></tr></thead><tbody>' + venc_rows + '</tbody></table>' if venc_rows else '<div class="empty-state"><div class="empty-state-icon">📅</div><p>Sin vencimientos</p></div>'}
+                    {'<table><thead><tr><th>Fecha</th><th>Estado</th><th>Obs.</th><th></th></tr></thead><tbody>' + venc_rows + '</tbody></table>' if venc_rows else '<div class="empty-state"><div class="empty-state-icon">📅</div><p>Sin vencimientos</p></div>'}
                 </div>
             </div>"""
 
@@ -740,7 +926,13 @@ def home(
                     </div>
                 </div>
 
-                <a href="/edit_vehicle/{v.id}" class="btn btn-secondary btn-sm">Editar vehiculo</a>
+                <div class="btn-group">
+                    <a href="/edit_vehicle/{v.id}" class="btn btn-secondary btn-sm">✏️ Editar vehiculo</a>
+                    <form method="post" action="/delete_vehicle" style="display:inline;">
+                        <input type="hidden" name="vehicle_id" value="{v.id}">
+                        <button class="btn btn-danger btn-sm" onclick="return confirm('¿Eliminar {v.patente}? Esta accion no se puede deshacer.')">🗑️ Eliminar</button>
+                    </form>
+                </div>
 
                 <div class="section">
                     <div class="section-title">Registrar service</div>
@@ -758,7 +950,7 @@ def home(
                 <div class="section">
                     <div class="section-title">Historial de services</div>
                     <div class="card">
-                        {'<table><thead><tr><th>Fecha</th><th>KM</th><th>Tipo</th><th>Costo</th><th>Obs.</th></tr></thead><tbody>' + services_rows + '</tbody></table>' if services_rows else '<div class="empty-state"><div class="empty-state-icon">🔧</div><p>Sin services registrados</p></div>'}
+                        {'<table><thead><tr><th>Fecha</th><th>KM</th><th>Tipo</th><th>Costo</th><th>Obs.</th><th></th></tr></thead><tbody>' + services_rows + '</tbody></table>' if services_rows else '<div class="empty-state"><div class="empty-state-icon">🔧</div><p>Sin services</p></div>'}
                     </div>
                 </div>
 
@@ -789,9 +981,11 @@ def home(
         {MODERN_STYLES}
     </head>
     <body>
+        {nav_component("vehiculos")}
+        
         <div class="container">
-            <h1>FleetUp</h1>
-            <div class="subtitle">Sistema de gestion de flota vehicular</div>
+            <h1>Vehiculos</h1>
+            <div class="subtitle">Gestion de flota vehicular</div>
 
             <div class="stats">
                 <div class="stat-card">
@@ -833,6 +1027,137 @@ def home(
             <div class="section-title">Vehiculos</div>
             {html_vehicles}
         </div>
+
+        <button class="modal-trigger" onclick="document.getElementById('addVehicleModal').classList.add('active')">+</button>
+
+        <div class="modal" id="addVehicleModal">
+            <div class="modal-content">
+                <button class="modal-close" onclick="document.getElementById('addVehicleModal').classList.remove('active')">×</button>
+                <h2 style="margin-bottom:24px;">Agregar vehiculo</h2>
+                <form method="post" action="/add_vehicle">
+                    <div class="form-grid-2" style="margin-bottom:16px;">
+                        <div><label>Patente</label><input name="patente" placeholder="ABC123" required></div>
+                        <div><label>Modelo</label><input name="modelo" placeholder="Toyota Corolla" required></div>
+                    </div>
+                    <div class="form-grid-2" style="margin-bottom:24px;">
+                        <div><label>KM actuales</label><input name="kilometros" type="number" placeholder="0" required></div>
+                        <div><label>Valor mensual</label><input name="valor_mensual" placeholder="0"></div>
+                    </div>
+                    
+                    <div class="section-title">Asignacion comercial</div>
+                    <div class="form-grid-2" style="margin-bottom:16px;">
+                        <div><label>Empresa</label><input name="empresa_asignada" placeholder="Nombre empresa"></div>
+                        <div><label>Fecha</label><input name="fecha_asignacion" type="date"></div>
+                    </div>
+                    <div style="margin-bottom:24px;">
+                        <label>KM asignacion</label>
+                        <input name="km_asignacion" type="number" placeholder="0">
+                    </div>
+                    
+                    <button class="btn btn-primary" type="submit" style="width:100%;">Guardar vehiculo</button>
+                </form>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
+
+
+# =========================================================
+# DASHBOARD
+# =========================================================
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard():
+    db = SessionLocal()
+    vehicles = db.query(Vehicle).all()
+
+    total_ingresos = 0
+    total_gastos = 0
+    rows = ""
+
+    for v in vehicles:
+        alerta_texto, _, alerta_tipo = calcular_alerta(v)
+        ingreso = to_number(v.valor_mensual)
+        gastos = sum(to_number(s.costo) for s in v.services) + sum(to_number(e.monto) for e in v.expenses)
+        ganancia = ingreso - gastos
+
+        total_ingresos += ingreso
+        total_gastos += gastos
+
+        badge_class = get_badge_class(alerta_tipo)
+        ganancia_class = "positive" if ganancia >= 0 else "negative"
+
+        rows += f"""
+        <tr>
+            <td><a href="/" style="color:var(--accent);text-decoration:none;font-weight:600;">{v.patente}</a></td>
+            <td>{v.modelo}</td>
+            <td>{v.empresa_asignada or '—'}</td>
+            <td>${ingreso:,}</td>
+            <td>${gastos:,}</td>
+            <td><span class="stat-value {ganancia_class}" style="font-size:16px;">${ganancia:,}</span></td>
+            <td><span class="badge {badge_class}">{alerta_texto}</span></td>
+        </tr>"""
+
+    db.close()
+
+    ganancia_total = total_ingresos - total_gastos
+    ganancia_class = "positive" if ganancia_total >= 0 else "negative"
+
+    html = f"""
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Dashboard - FleetUp</title>
+        {MODERN_STYLES}
+    </head>
+    <body>
+        {nav_component("dashboard")}
+        
+        <div class="container">
+            <h1>Dashboard General</h1>
+            <div class="subtitle">Resumen financiero de toda la flota</div>
+
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-label">Facturacion mensual</div>
+                    <div class="stat-value">${total_ingresos:,}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Gastos totales</div>
+                    <div class="stat-value negative">${total_gastos:,}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Ganancia total</div>
+                    <div class="stat-value {ganancia_class}">${ganancia_total:,}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Vehiculos activos</div>
+                    <div class="stat-value">{len(vehicles)}</div>
+                </div>
+            </div>
+
+            <div class="section-title">Detalle por vehiculo</div>
+            <div class="card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Patente</th>
+                            <th>Modelo</th>
+                            <th>Empresa</th>
+                            <th>Ingreso</th>
+                            <th>Gastos</th>
+                            <th>Ganancia</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>{rows}</tbody>
+                </table>
+            </div>
+        </div>
     </body>
     </html>
     """
@@ -868,17 +1193,17 @@ def edit_vehicle_form(vehicle_id: int):
             
             <div class="card">
                 <form method="post" action="/edit_vehicle/{v.id}">
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+                    <div class="form-grid-2" style="margin-bottom:16px;">
                         <div><label>Patente</label><input name="patente" value="{v.patente}" required></div>
                         <div><label>Modelo</label><input name="modelo" value="{v.modelo}" required></div>
                     </div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px;">
+                    <div class="form-grid-2" style="margin-bottom:24px;">
                         <div><label>KM actuales</label><input name="kilometros" type="number" value="{v.kilometros}" required></div>
                         <div><label>Valor mensual</label><input name="valor_mensual" value="{v.valor_mensual}"></div>
                     </div>
                     
                     <div class="section-title">Asignacion comercial</div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+                    <div class="form-grid-2" style="margin-bottom:16px;">
                         <div><label>Empresa</label><input name="empresa_asignada" value="{v.empresa_asignada or ''}"></div>
                         <div><label>Fecha</label><input name="fecha_asignacion" type="date" value="{v.fecha_asignacion or ''}"></div>
                     </div>
@@ -887,7 +1212,7 @@ def edit_vehicle_form(vehicle_id: int):
                         <input name="km_asignacion" type="number" value="{v.km_asignacion or 0}">
                     </div>
                     
-                    <div style="display:flex; gap:12px;">
+                    <div class="btn-group">
                         <button class="btn btn-primary" type="submit">Guardar cambios</button>
                         <a class="btn btn-secondary" href="/">Cancelar</a>
                     </div>
@@ -921,6 +1246,229 @@ def edit_vehicle(
         v.fecha_asignacion = fecha_asignacion
         v.km_asignacion = km_asignacion
         v.valor_mensual = valor_mensual
+        db.commit()
+    db.close()
+    return RedirectResponse("/", status_code=302)
+
+
+# =========================================================
+# EDITAR SERVICE
+# =========================================================
+
+@app.get("/edit_service/{service_id}", response_class=HTMLResponse)
+def edit_service_form(service_id: int):
+    db = SessionLocal()
+    s = db.query(Service).filter(Service.id == service_id).first()
+    db.close()
+
+    if not s:
+        return RedirectResponse("/")
+
+    html = f"""
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Editar Service</title>
+        {MODERN_STYLES}
+    </head>
+    <body>
+        <div class="container" style="max-width:700px;">
+            <h1>Editar Service</h1>
+            <div class="subtitle">Actualizar datos del service</div>
+            
+            <div class="card">
+                <form method="post" action="/edit_service/{s.id}">
+                    <div class="form-grid-2" style="margin-bottom:16px;">
+                        <div><label>Fecha</label><input name="fecha" type="date" value="{s.fecha}" required></div>
+                        <div><label>Kilometraje</label><input name="kilometraje" type="number" value="{s.kilometraje}" required></div>
+                    </div>
+                    <div class="form-grid-2" style="margin-bottom:16px;">
+                        <div><label>Tipo</label><input name="tipo_service" value="{s.tipo_service}" required></div>
+                        <div><label>Costo</label><input name="costo" value="{s.costo}" required></div>
+                    </div>
+                    <div style="margin-bottom:24px;">
+                        <label>Observaciones</label>
+                        <input name="observaciones" value="{s.observaciones or ''}">
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button class="btn btn-primary" type="submit">Guardar cambios</button>
+                        <a class="btn btn-secondary" href="/">Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
+
+
+@app.post("/edit_service/{service_id}")
+def edit_service(
+    service_id: int,
+    fecha: str = Form(...),
+    kilometraje: int = Form(...),
+    tipo_service: str = Form(...),
+    costo: str = Form(...),
+    observaciones: str = Form("")
+):
+    db = SessionLocal()
+    s = db.query(Service).filter(Service.id == service_id).first()
+    if s:
+        s.fecha = fecha
+        s.kilometraje = kilometraje
+        s.tipo_service = tipo_service
+        s.costo = costo
+        s.observaciones = observaciones
+        db.commit()
+    db.close()
+    return RedirectResponse("/", status_code=302)
+
+
+# =========================================================
+# EDITAR GASTO
+# =========================================================
+
+@app.get("/edit_expense/{expense_id}", response_class=HTMLResponse)
+def edit_expense_form(expense_id: int):
+    db = SessionLocal()
+    g = db.query(VehicleExpense).filter(VehicleExpense.id == expense_id).first()
+    db.close()
+
+    if not g:
+        return RedirectResponse("/")
+
+    categorias = ["Patente", "Seguro", "VTV/BTV", "Cubiertas", "Otros"]
+    options = "".join([f'<option value="{cat}" {"selected" if g.categoria == cat else ""}>{cat}</option>' for cat in categorias])
+
+    html = f"""
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Editar Gasto</title>
+        {MODERN_STYLES}
+    </head>
+    <body>
+        <div class="container" style="max-width:700px;">
+            <h1>Editar Gasto</h1>
+            <div class="subtitle">Actualizar datos del gasto</div>
+            
+            <div class="card">
+                <form method="post" action="/edit_expense/{g.id}">
+                    <div class="form-grid-2" style="margin-bottom:16px;">
+                        <div><label>Categoria</label><select name="categoria" required>{options}</select></div>
+                        <div><label>Fecha</label><input name="fecha" type="date" value="{g.fecha or ''}"></div>
+                    </div>
+                    <div class="form-grid-2" style="margin-bottom:24px;">
+                        <div><label>Monto</label><input name="monto" value="{g.monto}" required></div>
+                        <div><label>Observaciones</label><input name="observaciones" value="{g.observaciones or ''}"></div>
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button class="btn btn-primary" type="submit">Guardar cambios</button>
+                        <a class="btn btn-secondary" href="/">Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
+
+
+@app.post("/edit_expense/{expense_id}")
+def edit_expense(
+    expense_id: int,
+    categoria: str = Form(...),
+    fecha: str = Form(""),
+    monto: str = Form(...),
+    observaciones: str = Form("")
+):
+    db = SessionLocal()
+    g = db.query(VehicleExpense).filter(VehicleExpense.id == expense_id).first()
+    if g:
+        g.categoria = categoria
+        g.fecha = fecha
+        g.monto = monto
+        g.observaciones = observaciones
+        db.commit()
+    db.close()
+    return RedirectResponse("/", status_code=302)
+
+
+# =========================================================
+# EDITAR VENCIMIENTO
+# =========================================================
+
+@app.get("/edit_deadline/{deadline_id}", response_class=HTMLResponse)
+def edit_deadline_form(deadline_id: int):
+    db = SessionLocal()
+    d = db.query(VehicleDeadline).filter(VehicleDeadline.id == deadline_id).first()
+    db.close()
+
+    if not d:
+        return RedirectResponse("/")
+
+    tipos = ["Patente", "Seguro", "VTV/BTV", "Cubiertas", "Otros"]
+    options = "".join([f'<option value="{t}" {"selected" if d.tipo == t else ""}>{t}</option>' for t in tipos])
+
+    html = f"""
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Editar Vencimiento</title>
+        {MODERN_STYLES}
+    </head>
+    <body>
+        <div class="container" style="max-width:700px;">
+            <h1>Editar Vencimiento</h1>
+            <div class="subtitle">Actualizar datos del vencimiento</div>
+            
+            <div class="card">
+                <form method="post" action="/edit_deadline/{d.id}">
+                    <div class="form-grid-2" style="margin-bottom:16px;">
+                        <div><label>Tipo</label><select name="tipo" required>{options}</select></div>
+                        <div><label>Fecha vencimiento</label><input name="fecha_vencimiento" type="date" value="{d.fecha_vencimiento or ''}" required></div>
+                    </div>
+                    <div style="margin-bottom:24px;">
+                        <label>Observaciones</label>
+                        <input name="observaciones" value="{d.observaciones or ''}">
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button class="btn btn-primary" type="submit">Guardar cambios</button>
+                        <a class="btn btn-secondary" href="/">Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
+
+
+@app.post("/edit_deadline/{deadline_id}")
+def edit_deadline(
+    deadline_id: int,
+    tipo: str = Form(...),
+    fecha_vencimiento: str = Form(...),
+    observaciones: str = Form("")
+):
+    db = SessionLocal()
+    d = db.query(VehicleDeadline).filter(VehicleDeadline.id == deadline_id).first()
+    if d:
+        d.tipo = tipo
+        d.fecha_vencimiento = fecha_vencimiento
+        d.observaciones = observaciones
         db.commit()
     db.close()
     return RedirectResponse("/", status_code=302)
