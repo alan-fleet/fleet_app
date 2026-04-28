@@ -1,6 +1,6 @@
 # main.py
-# FleetUp - Version completa con todas las funcionalidades
-# PASO 6 FINAL: Eliminar vehiculo + Edicion completa + Dashboard
+# FleetUp - Secciones colapsables dentro de vehiculos
+# PASO 7: Desplegables internos
 
 import os
 from datetime import datetime
@@ -614,6 +614,56 @@ details[open] .vehicle-body {
     font-family: 'JetBrains Mono', monospace;
 }
 
+/* INNER COLLAPSIBLE SECTIONS */
+.inner-section {
+    margin-top: 24px;
+}
+
+.inner-section summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 12px 16px;
+    background: var(--bg-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.3s;
+    user-select: none;
+}
+
+.inner-section summary:hover {
+    background: rgba(0, 217, 255, 0.05);
+    border-color: var(--accent);
+}
+
+.inner-section summary::before {
+    content: '▶';
+    font-size: 10px;
+    transition: transform 0.3s;
+    color: var(--accent);
+}
+
+.inner-section[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.inner-section[open] summary {
+    border-radius: 8px 8px 0 0;
+    border-bottom: none;
+}
+
+.inner-content {
+    background: var(--bg-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    padding: 20px;
+}
+
 /* SECTIONS */
 .section {
     margin-top: 32px;
@@ -883,18 +933,18 @@ def home(
                 </tr>"""
 
             categorias_html += f"""
-            <div class="section">
-                <div class="section-title">{cat}</div>
-                <div class="card">
+            <details class="inner-section">
+                <summary>{cat}</summary>
+                <div class="inner-content">
                     <h4 style="margin-bottom:12px; font-size:12px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:1px;">Gastos</h4>
-                    {'<table><thead><tr><th>Fecha</th><th>Monto</th><th>Obs.</th><th></th></tr></thead><tbody>' + gastos_rows + '</tbody></table>' if gastos_rows else '<div class="empty-state"><div class="empty-state-icon">💸</div><p>Sin gastos</p></div>'}
+                    {'<table><thead><tr><th>Fecha</th><th>Monto</th><th>Obs.</th><th></th></tr></thead><tbody>' + gastos_rows + '</tbody></table>' if gastos_rows else '<div class="empty-state" style="padding:30px 20px;"><p>Sin gastos</p></div>'}
                     
                     <div class="divider"></div>
                     
                     <h4 style="margin-bottom:12px; font-size:12px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:1px;">Vencimientos</h4>
-                    {'<table><thead><tr><th>Fecha</th><th>Estado</th><th>Obs.</th><th></th></tr></thead><tbody>' + venc_rows + '</tbody></table>' if venc_rows else '<div class="empty-state"><div class="empty-state-icon">📅</div><p>Sin vencimientos</p></div>'}
+                    {'<table><thead><tr><th>Fecha</th><th>Estado</th><th>Obs.</th><th></th></tr></thead><tbody>' + venc_rows + '</tbody></table>' if venc_rows else '<div class="empty-state" style="padding:30px 20px;"><p>Sin vencimientos</p></div>'}
                 </div>
-            </div>"""
+            </details>"""
 
         ganancia_class = "positive" if ganancia >= 0 else "negative"
         badge_class = get_badge_class(alerta_tipo)
@@ -911,48 +961,55 @@ def home(
                 </div>
             </summary>
             <div class="vehicle-body">
-                <div class="mini-stats">
-                    <div class="mini-stat">
-                        <div class="mini-stat-label">Ingreso</div>
-                        <div class="mini-stat-value" style="color:var(--accent);">${ingreso_mensual:,}</div>
+                <details class="inner-section" open>
+                    <summary>Dashboard financiero</summary>
+                    <div class="inner-content">
+                        <div class="mini-stats">
+                            <div class="mini-stat">
+                                <div class="mini-stat-label">Ingreso</div>
+                                <div class="mini-stat-value" style="color:var(--accent);">${ingreso_mensual:,}</div>
+                            </div>
+                            <div class="mini-stat">
+                                <div class="mini-stat-label">Gastos</div>
+                                <div class="mini-stat-value" style="color:var(--danger);">${gasto_total:,}</div>
+                            </div>
+                            <div class="mini-stat">
+                                <div class="mini-stat-label">Ganancia</div>
+                                <div class="mini-stat-value stat-value {ganancia_class}">${ganancia:,}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="btn-group">
+                            <a href="/edit_vehicle/{v.id}" class="btn btn-secondary btn-sm">✏️ Editar</a>
+                            <form method="post" action="/delete_vehicle" style="display:inline;">
+                                <input type="hidden" name="vehicle_id" value="{v.id}">
+                                <button class="btn btn-danger btn-sm" onclick="return confirm('¿Eliminar {v.patente}?')">🗑️ Eliminar</button>
+                            </form>
+                        </div>
                     </div>
-                    <div class="mini-stat">
-                        <div class="mini-stat-label">Gastos</div>
-                        <div class="mini-stat-value" style="color:var(--danger);">${gasto_total:,}</div>
-                    </div>
-                    <div class="mini-stat">
-                        <div class="mini-stat-label">Ganancia</div>
-                        <div class="mini-stat-value stat-value {ganancia_class}">${ganancia:,}</div>
-                    </div>
-                </div>
+                </details>
 
-                <div class="btn-group">
-                    <a href="/edit_vehicle/{v.id}" class="btn btn-secondary btn-sm">✏️ Editar vehiculo</a>
-                    <form method="post" action="/delete_vehicle" style="display:inline;">
-                        <input type="hidden" name="vehicle_id" value="{v.id}">
-                        <button class="btn btn-danger btn-sm" onclick="return confirm('¿Eliminar {v.patente}? Esta accion no se puede deshacer.')">🗑️ Eliminar</button>
-                    </form>
-                </div>
-
-                <div class="section">
-                    <div class="section-title">Registrar service</div>
-                    <form method="post" action="/add_service" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                        <input type="hidden" name="vehicle_id" value="{v.id}">
-                        <div><label>Fecha</label><input name="fecha" type="date" required></div>
-                        <div><label>Kilometraje</label><input name="kilometraje" type="number" placeholder="0" required></div>
-                        <div><label>Tipo</label><input name="tipo_service" placeholder="Aceite y filtros" required></div>
-                        <div><label>Costo</label><input name="costo" placeholder="0" required></div>
-                        <div style="grid-column:1/-1;"><label>Observaciones</label><input name="observaciones" placeholder="Opcional"></div>
-                        <div style="grid-column:1/-1;"><button class="btn btn-primary" type="submit">Guardar service</button></div>
-                    </form>
-                </div>
-
-                <div class="section">
-                    <div class="section-title">Historial de services</div>
-                    <div class="card">
-                        {'<table><thead><tr><th>Fecha</th><th>KM</th><th>Tipo</th><th>Costo</th><th>Obs.</th><th></th></tr></thead><tbody>' + services_rows + '</tbody></table>' if services_rows else '<div class="empty-state"><div class="empty-state-icon">🔧</div><p>Sin services</p></div>'}
+                <details class="inner-section">
+                    <summary>Registrar service</summary>
+                    <div class="inner-content">
+                        <form method="post" action="/add_service" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                            <input type="hidden" name="vehicle_id" value="{v.id}">
+                            <div><label>Fecha</label><input name="fecha" type="date" required></div>
+                            <div><label>Kilometraje</label><input name="kilometraje" type="number" placeholder="0" required></div>
+                            <div><label>Tipo</label><input name="tipo_service" placeholder="Aceite y filtros" required></div>
+                            <div><label>Costo</label><input name="costo" placeholder="0" required></div>
+                            <div style="grid-column:1/-1;"><label>Observaciones</label><input name="observaciones" placeholder="Opcional"></div>
+                            <div style="grid-column:1/-1;"><button class="btn btn-primary" type="submit">Guardar service</button></div>
+                        </form>
                     </div>
-                </div>
+                </details>
+
+                <details class="inner-section">
+                    <summary>Historial de services</summary>
+                    <div class="inner-content">
+                        {'<table><thead><tr><th>Fecha</th><th>KM</th><th>Tipo</th><th>Costo</th><th>Obs.</th><th></th></tr></thead><tbody>' + services_rows + '</tbody></table>' if services_rows else '<div class="empty-state" style="padding:30px 20px;"><p>Sin services</p></div>'}
+                    </div>
+                </details>
 
                 {categorias_html}
             </div>
@@ -1062,6 +1119,10 @@ def home(
     </html>
     """
     return HTMLResponse(content=html)
+
+
+# [El resto del código sigue igual - Dashboard, Editar vehiculo, Editar service, etc...]
+# Por brevedad no lo repito acá, pero va completo en el archivo
 
 
 # =========================================================
