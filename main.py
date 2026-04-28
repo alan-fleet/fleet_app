@@ -1,13 +1,9 @@
 # main.py
-# FleetUp + Dashboard Financiero + Gastos Separados por Categoria + Vencimientos + Desplegables
-# PASO 4 FINAL: Alertas por email
+# FleetUp - Diseno moderno mejorado
+# PASO 5: UI moderna con dark theme
 
 import os
-import smtplib
 from datetime import datetime
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-
 from fastapi import FastAPI, Form, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
@@ -45,81 +41,57 @@ class Vehicle(Base):
     __tablename__ = "vehicles"
 
     id = Column(Integer, primary_key=True, index=True)
-
     patente = Column(String, unique=True)
     modelo = Column(String)
     kilometros = Column(Integer)
-
     empresa_asignada = Column(String, default="")
     fecha_asignacion = Column(String, default="")
     km_asignacion = Column(Integer, default=0)
     valor_mensual = Column(String, default="0")
 
-    services = relationship(
-        "Service",
-        back_populates="vehicle",
-        cascade="all, delete-orphan"
-    )
+    services = relationship("Service", back_populates="vehicle", cascade="all, delete-orphan")
+    expenses = relationship("VehicleExpense", back_populates="vehicle", cascade="all, delete-orphan")
+    deadlines = relationship("VehicleDeadline", back_populates="vehicle", cascade="all, delete-orphan")
 
-    expenses = relationship(
-        "VehicleExpense",
-        back_populates="vehicle",
-        cascade="all, delete-orphan"
-    )
-
-    deadlines = relationship(
-        "VehicleDeadline",
-        back_populates="vehicle",
-        cascade="all, delete-orphan"
-    )
 
 class Service(Base):
     __tablename__ = "services"
 
     id = Column(Integer, primary_key=True, index=True)
     vehicle_id = Column(Integer, ForeignKey("vehicles.id"))
-
     fecha = Column(String)
     kilometraje = Column(Integer)
     tipo_service = Column(String)
     costo = Column(String, default="0")
     observaciones = Column(String, default="")
 
-    vehicle = relationship(
-        "Vehicle",
-        back_populates="services"
-    )
+    vehicle = relationship("Vehicle", back_populates="services")
+
 
 class VehicleExpense(Base):
     __tablename__ = "vehicle_expenses"
 
     id = Column(Integer, primary_key=True, index=True)
     vehicle_id = Column(Integer, ForeignKey("vehicles.id"))
-
     categoria = Column(String)
     fecha = Column(String, default="")
     monto = Column(String, default="0")
     observaciones = Column(String, default="")
 
-    vehicle = relationship(
-        "Vehicle",
-        back_populates="expenses"
-    )
+    vehicle = relationship("Vehicle", back_populates="expenses")
+
 
 class VehicleDeadline(Base):
     __tablename__ = "vehicle_deadlines"
 
     id = Column(Integer, primary_key=True, index=True)
     vehicle_id = Column(Integer, ForeignKey("vehicles.id"))
-
     tipo = Column(String)
     fecha_vencimiento = Column(String, default="")
     observaciones = Column(String, default="")
 
-    vehicle = relationship(
-        "Vehicle",
-        back_populates="deadlines"
-    )
+    vehicle = relationship("Vehicle", back_populates="deadlines")
+
 
 Base.metadata.create_all(bind=engine)
 
@@ -129,133 +101,532 @@ Base.metadata.create_all(bind=engine)
 
 def to_number(valor):
     try:
-        limpio = (
-            str(valor)
-            .replace("$", "")
-            .replace(".", "")
-            .replace(",", "")
-            .strip()
-        )
+        limpio = str(valor).replace("$", "").replace(".", "").replace(",", "").strip()
         return int(limpio) if limpio else 0
     except:
         return 0
 
+
 def calcular_alerta(vehicle):
     if not vehicle.services:
         if vehicle.kilometros >= 13000:
-            return "Proximo service", "#fff3cd", "proximo"
-        return "Sin services cargados", "#d4edda", "ok"
+            return "Proximo service", "#1a1d29", "proximo"
+        return "Sin services", "#1a1d29", "ok"
 
-    ultimo_service = max(
-        vehicle.services,
-        key=lambda s: s.kilometraje
-    )
-
+    ultimo_service = max(vehicle.services, key=lambda s: s.kilometraje)
     km_desde_service = vehicle.kilometros - ultimo_service.kilometraje
 
     if km_desde_service >= 14000:
-        return "Service vencido", "#f8d7da", "vencido"
+        return "Service vencido", "#1a1d29", "vencido"
     elif km_desde_service >= 13000:
-        return "Proximo service", "#fff3cd", "proximo"
+        return "Proximo service", "#1a1d29", "proximo"
     else:
-        return "Todo OK", "#d4edda", "ok"
+        return "Todo OK", "#1a1d29", "ok"
+
 
 def alerta_vencimiento(fecha):
     try:
         hoy = datetime.today()
         venc = datetime.strptime(fecha, "%Y-%m-%d")
         dias = (venc - hoy).days
-
         if dias < 0:
-            return "Vencido"
+            return "Vencido", "danger"
         elif dias <= 30:
-            return "Proximo a vencer"
+            return "Proximo", "warning"
         else:
-            return "Vigente"
+            return "Vigente", "ok"
     except:
-        return "Sin fecha valida"
+        return "Sin fecha", "muted"
+
 
 def filtrar_categoria(items, nombre):
     return [x for x in items if x.categoria == nombre]
 
+
 def filtrar_deadline(items, nombre):
     return [x for x in items if x.tipo == nombre]
 
+
+def get_badge_class(tipo):
+    if tipo == "vencido":
+        return "badge-danger"
+    elif tipo == "proximo":
+        return "badge-warning"
+    return "badge-ok"
+
+
+def get_deadline_badge(estado_tuple):
+    _, tipo = estado_tuple
+    if tipo == "danger":
+        return "badge-danger"
+    elif tipo == "warning":
+        return "badge-warning"
+    elif tipo == "ok":
+        return "badge-ok"
+    return "badge-muted"
+
 # =========================================================
-# HTML BASE
+# ESTILOS MODERNOS
 # =========================================================
 
-HTML = """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>FleetUp</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-</head>
+MODERN_STYLES = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
 
-<body style="font-family:Arial; padding:20px; max-width:1100px; margin:auto;">
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
 
-<h1>FleetUp</h1>
+:root {
+    --bg-primary: #0a0e1a;
+    --bg-secondary: #12172b;
+    --bg-card: #1a1d29;
+    --text-primary: #e4e7f0;
+    --text-secondary: #8b92b3;
+    --accent: #00d9ff;
+    --accent-glow: rgba(0, 217, 255, 0.3);
+    --danger: #ff4757;
+    --danger-glow: rgba(255, 71, 87, 0.2);
+    --warning: #ffa502;
+    --warning-glow: rgba(255, 165, 2, 0.2);
+    --success: #26de81;
+    --success-glow: rgba(38, 222, 129, 0.2);
+    --radius: 16px;
+    --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
 
-{dashboard_general}
+body {
+    font-family: 'Outfit', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+}
 
-<hr>
+body::before {
+    content: '';
+    position: fixed;
+    top: -50%;
+    right: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle at 30% 50%, rgba(0, 217, 255, 0.05) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+}
 
-<h2>Buscar vehiculos</h2>
-<form method="get" action="/" style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:20px;">
-    <div style="display:grid; grid-template-columns:2fr 1fr auto auto; gap:10px; align-items:end;">
-        <div>
-            <label style="font-size:12px; color:#666;">Buscar por patente o modelo</label>
-            <input name="q" value="{search_query}" placeholder="Ej: ABC123 o Toyota" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
-        </div>
-        <div>
-            <label style="font-size:12px; color:#666;">Filtrar por estado</label>
-            <select name="filtro" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
-                <option value="todos" {sel_todos}>Todos</option>
-                <option value="ok" {sel_ok}>Todo OK</option>
-                <option value="proximo" {sel_proximo}>Proximo service</option>
-                <option value="vencido" {sel_vencido}>Service vencido</option>
-            </select>
-        </div>
-        <button type="submit" style="padding:8px 16px; background:#007bff; color:white; border:none; border-radius:4px; cursor:pointer;">Buscar</button>
-        <a href="/" style="padding:8px 16px; background:#6c757d; color:white; text-decoration:none; border-radius:4px; display:inline-block; text-align:center;">Limpiar</a>
-    </div>
-</form>
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 24px;
+    position: relative;
+    z-index: 1;
+}
 
-<div style="text-align:right; margin-bottom:10px;">
-    <a href="/send_alerts" style="padding:8px 16px; background:#28a745; color:white; text-decoration:none; border-radius:4px; display:inline-block;">Enviar alertas por email</a>
-</div>
+h1 {
+    font-size: 48px;
+    font-weight: 800;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, var(--accent), #00a8cc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -1px;
+}
 
-<hr>
+.subtitle {
+    color: var(--text-secondary);
+    font-size: 16px;
+    margin-bottom: 40px;
+    font-weight: 300;
+}
 
-<h2>Agregar vehiculo</h2>
+/* CARDS */
+.card {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
 
-<form method="post" action="/add_vehicle">
-    <p><input name="patente" placeholder="Patente" required></p>
-    <p><input name="modelo" placeholder="Modelo" required></p>
-    <p><input name="kilometros" type="number" placeholder="KM actuales" required></p>
+.card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+}
 
-    <h3>Asignacion comercial</h3>
-    <p><input name="empresa_asignada" placeholder="Empresa asignada"></p>
-    <p><input name="fecha_asignacion" placeholder="Fecha asignacion"></p>
-    <p><input name="km_asignacion" type="number" placeholder="KM asignacion"></p>
-    <p><input name="valor_mensual" placeholder="Valor mensual"></p>
+.card:hover::before {
+    opacity: 1;
+}
 
-    <button type="submit">Guardar vehiculo</button>
-</form>
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 48px rgba(0, 217, 255, 0.15);
+}
 
-<hr>
+/* STATS GRID */
+.stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
+    margin-bottom: 32px;
+}
 
-<h2>Vehiculos</h2>
+.stat-card {
+    background: var(--bg-secondary);
+    border-radius: var(--radius);
+    padding: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    position: relative;
+    overflow: hidden;
+}
 
-{vehicles}
+.stat-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--success));
+}
 
-</body>
-</html>
+.stat-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.stat-value {
+    font-size: 36px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent);
+}
+
+.stat-value.positive { color: var(--success); }
+.stat-value.negative { color: var(--danger); }
+
+/* BADGES */
+.badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge-ok {
+    background: var(--success-glow);
+    color: var(--success);
+    border: 1px solid var(--success);
+}
+
+.badge-warning {
+    background: var(--warning-glow);
+    color: var(--warning);
+    border: 1px solid var(--warning);
+}
+
+.badge-danger {
+    background: var(--danger-glow);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+}
+
+.badge-muted {
+    background: rgba(139, 146, 179, 0.1);
+    color: var(--text-secondary);
+    border: 1px solid var(--text-secondary);
+}
+
+/* BUTTONS */
+.btn {
+    display: inline-block;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-family: 'Outfit', sans-serif;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--accent), #00a8cc);
+    color: #000;
+    box-shadow: 0 4px 16px var(--accent-glow);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px var(--accent-glow);
+}
+
+.btn-secondary {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-secondary:hover {
+    background: var(--bg-card);
+    border-color: var(--accent);
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, var(--danger), #d63031);
+    color: white;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+/* FORMS */
+.search-bar {
+    background: var(--bg-secondary);
+    padding: 20px;
+    border-radius: var(--radius);
+    margin-bottom: 32px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr auto auto;
+    gap: 12px;
+    align-items: end;
+}
+
+label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    font-weight: 600;
+}
+
+input, select {
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--bg-primary);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: 'Outfit', sans-serif;
+    transition: all 0.3s;
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+/* VEHICLE CARDS */
+.vehicle-card {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.vehicle-header {
+    padding: 20px 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: background 0.3s;
+    position: relative;
+}
+
+.vehicle-header:hover {
+    background: rgba(0, 217, 255, 0.02);
+}
+
+.vehicle-header::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    transition: background 0.3s;
+}
+
+.vehicle-header.status-ok::before { background: var(--success); }
+.vehicle-header.status-proximo::before { background: var(--warning); }
+.vehicle-header.status-vencido::before { background: var(--danger); }
+
+.vehicle-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.vehicle-meta {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.vehicle-body {
+    padding: 0 24px 24px 24px;
+    display: none;
+}
+
+details[open] .vehicle-body {
+    display: block;
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.mini-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 20px 0;
+    padding: 20px;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+}
+
+.mini-stat {
+    text-align: center;
+}
+
+.mini-stat-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+
+.mini-stat-value {
+    font-size: 20px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* SECTIONS */
+.section {
+    margin-top: 32px;
+}
+
+.section-title {
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.section-title::before {
+    content: '';
+    width: 3px;
+    height: 14px;
+    background: var(--accent);
+    border-radius: 2px;
+}
+
+.divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    margin: 32px 0;
+}
+
+/* TABLES */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+th {
+    text-align: left;
+    padding: 12px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+td {
+    padding: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+}
+
+tr:hover td {
+    background: rgba(0, 217, 255, 0.02);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-secondary);
+}
+
+.empty-state-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.3;
+}
+</style>
 """
 
 # =========================================================
-# HOME CON BUSQUEDA Y FILTROS
+# HOME
 # =========================================================
 
 @app.get("/", response_class=HTMLResponse)
@@ -270,18 +641,11 @@ def home(
     total_gastos = 0
     html_vehicles = ""
 
-    categorias = [
-        "Patente",
-        "Seguro",
-        "VTV/BTV",
-        "Cubiertas",
-        "Otros"
-    ]
+    categorias = ["Patente", "Seguro", "VTV/BTV", "Cubiertas", "Otros"]
 
     for v in vehicles:
         alerta_texto, alerta_color, alerta_tipo = calcular_alerta(v)
 
-        # FILTROS
         if q and q.lower() not in v.patente.lower() and q.lower() not in v.modelo.lower():
             continue
         if filtro != "todos" and alerta_tipo != filtro:
@@ -290,181 +654,124 @@ def home(
         ingreso_mensual = to_number(v.valor_mensual)
         gasto_services = sum(to_number(s.costo) for s in v.services)
         gasto_extra = sum(to_number(e.monto) for e in v.expenses)
-
         gasto_total = gasto_services + gasto_extra
         ganancia = ingreso_mensual - gasto_total
 
         total_ingresos += ingreso_mensual
         total_gastos += gasto_total
 
-        services_html = ""
-        for s in v.services:
-            services_html += f"""
-            <li>
-                {s.fecha} | {s.kilometraje} km |
-                {s.tipo_service} | ${s.costo}
-            </li>
-            """
+        services_rows = ""
+        for s in sorted(v.services, key=lambda x: x.kilometraje, reverse=True):
+            services_rows += f"""
+            <tr>
+                <td>{s.fecha}</td>
+                <td>{s.kilometraje:,} km</td>
+                <td>{s.tipo_service}</td>
+                <td>${to_number(s.costo):,}</td>
+                <td style="font-family: 'Outfit', sans-serif;">{s.observaciones}</td>
+            </tr>"""
 
         categorias_html = ""
-
         for cat in categorias:
             gastos_cat = filtrar_categoria(v.expenses, cat)
             venc_cat = filtrar_deadline(v.deadlines, cat)
 
-            gastos_html = ""
+            gastos_rows = ""
             for g in gastos_cat:
-                gastos_html += f"""
-                <li>{g.fecha} | ${g.monto} | {g.observaciones}</li>
-                """
+                gastos_rows += f"""
+                <tr>
+                    <td>{g.fecha}</td>
+                    <td>${to_number(g.monto):,}</td>
+                    <td style="font-family: 'Outfit', sans-serif;">{g.observaciones}</td>
+                </tr>"""
 
-            venc_html = ""
+            venc_rows = ""
             for d in venc_cat:
-                estado = alerta_vencimiento(d.fecha_vencimiento)
-                venc_html += f"""
-                <li>{d.fecha_vencimiento} | {estado} | {d.observaciones}</li>
-                """
+                estado_text, estado_tipo = alerta_vencimiento(d.fecha_vencimiento)
+                badge_class = get_deadline_badge((estado_text, estado_tipo))
+                venc_rows += f"""
+                <tr>
+                    <td>{d.fecha_vencimiento}</td>
+                    <td><span class="badge {badge_class}">{estado_text}</span></td>
+                    <td style="font-family: 'Outfit', sans-serif;">{d.observaciones}</td>
+                </tr>"""
 
             categorias_html += f"""
-            <details style="
-                margin-bottom:15px;
-                border:1px solid #ddd;
-                border-radius:8px;
-                padding:10px;
-                background:#fafafa;
-            ">
-                <summary style="
-                    cursor:pointer;
-                    font-size:18px;
-                    font-weight:bold;
-                ">
-                    {cat}
-                </summary>
+            <div class="section">
+                <div class="section-title">{cat}</div>
+                <div class="card">
+                    <h4 style="margin-bottom:12px; font-size:12px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:1px;">Gastos</h4>
+                    {'<table><thead><tr><th>Fecha</th><th>Monto</th><th>Obs.</th></tr></thead><tbody>' + gastos_rows + '</tbody></table>' if gastos_rows else '<div class="empty-state"><div class="empty-state-icon">💸</div><p>Sin gastos registrados</p></div>'}
+                    
+                    <div class="divider"></div>
+                    
+                    <h4 style="margin-bottom:12px; font-size:12px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:1px;">Vencimientos</h4>
+                    {'<table><thead><tr><th>Fecha</th><th>Estado</th><th>Obs.</th></tr></thead><tbody>' + venc_rows + '</tbody></table>' if venc_rows else '<div class="empty-state"><div class="empty-state-icon">📅</div><p>Sin vencimientos</p></div>'}
+                </div>
+            </div>"""
 
-                <h4>Historial de gastos</h4>
-                <ul>
-                    {gastos_html if gastos_html else "<li>Sin registros</li>"}
-                </ul>
-
-                <h4>Vencimientos</h4>
-                <ul>
-                    {venc_html if venc_html else "<li>Sin vencimientos</li>"}
-                </ul>
-            </details>
-            """
+        ganancia_class = "positive" if ganancia >= 0 else "negative"
+        badge_class = get_badge_class(alerta_tipo)
 
         html_vehicles += f"""
-        <details style="
-            background:{alerta_color};
-            border:1px solid #ccc;
-            border-radius:10px;
-            padding:15px;
-            margin-bottom:20px;
-        ">
-
-            <summary style="cursor:pointer; font-size:18px;">
-                <strong>{v.patente} - {v.modelo}</strong>
+        <details class="vehicle-card">
+            <summary class="vehicle-header status-{alerta_tipo}">
+                <div>
+                    <div class="vehicle-title">{v.patente} — {v.modelo}</div>
+                    <div class="vehicle-meta">
+                        <span class="badge {badge_class}">{alerta_texto}</span>
+                        <span>{v.kilometros:,} km</span>
+                    </div>
+                </div>
             </summary>
+            <div class="vehicle-body">
+                <div class="mini-stats">
+                    <div class="mini-stat">
+                        <div class="mini-stat-label">Ingreso</div>
+                        <div class="mini-stat-value" style="color:var(--accent);">${ingreso_mensual:,}</div>
+                    </div>
+                    <div class="mini-stat">
+                        <div class="mini-stat-label">Gastos</div>
+                        <div class="mini-stat-value" style="color:var(--danger);">${gasto_total:,}</div>
+                    </div>
+                    <div class="mini-stat">
+                        <div class="mini-stat-label">Ganancia</div>
+                        <div class="mini-stat-value stat-value {ganancia_class}">${ganancia:,}</div>
+                    </div>
+                </div>
 
-            <h2>{alerta_texto}</h2>
+                <a href="/edit_vehicle/{v.id}" class="btn btn-secondary btn-sm">Editar vehiculo</a>
 
-            <p><strong>KM actuales:</strong> {v.kilometros}</p>
+                <div class="section">
+                    <div class="section-title">Registrar service</div>
+                    <form method="post" action="/add_service" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                        <input type="hidden" name="vehicle_id" value="{v.id}">
+                        <div><label>Fecha</label><input name="fecha" type="date" required></div>
+                        <div><label>Kilometraje</label><input name="kilometraje" type="number" placeholder="0" required></div>
+                        <div><label>Tipo</label><input name="tipo_service" placeholder="Aceite y filtros" required></div>
+                        <div><label>Costo</label><input name="costo" placeholder="0" required></div>
+                        <div style="grid-column:1/-1;"><label>Observaciones</label><input name="observaciones" placeholder="Opcional"></div>
+                        <div style="grid-column:1/-1;"><button class="btn btn-primary" type="submit">Guardar service</button></div>
+                    </form>
+                </div>
 
-            <h3>Dashboard financiero</h3>
-            <p><strong>Ingreso mensual:</strong> ${ingreso_mensual}</p>
-            <p><strong>Gasto total:</strong> ${gasto_total}</p>
-            <p><strong>Ganancia:</strong> ${ganancia}</p>
+                <div class="section">
+                    <div class="section-title">Historial de services</div>
+                    <div class="card">
+                        {'<table><thead><tr><th>Fecha</th><th>KM</th><th>Tipo</th><th>Costo</th><th>Obs.</th></tr></thead><tbody>' + services_rows + '</tbody></table>' if services_rows else '<div class="empty-state"><div class="empty-state-icon">🔧</div><p>Sin services registrados</p></div>'}
+                    </div>
+                </div>
 
-            <p>
-                <a href="/edit_vehicle/{v.id}" style="padding:8px 12px; background:#007bff; color:white; text-decoration:none; border-radius:4px; display:inline-block; margin-top:10px;">Editar vehiculo</a>
-            </p>
-
-            <hr>
-
-            <h3>Registrar service</h3>
-
-            <form method="post" action="/add_service">
-                <input type="hidden" name="vehicle_id" value="{v.id}">
-                <p><input name="fecha" placeholder="Fecha" required></p>
-                <p><input name="kilometraje" type="number" placeholder="Kilometraje" required></p>
-                <p><input name="tipo_service" placeholder="Tipo service" required></p>
-                <p><input name="costo" placeholder="Costo" required></p>
-                <p><input name="observaciones" placeholder="Observaciones"></p>
-                <button type="submit">Guardar service</button>
-            </form>
-
-            <h4>Historial services</h4>
-            <ul>{services_html}</ul>
-
-            <hr>
-
-            <h3>Agregar gasto</h3>
-
-            <form method="post" action="/add_expense">
-                <input type="hidden" name="vehicle_id" value="{v.id}">
-
-                <p>
-                    <select name="categoria" required>
-                        <option value="">Seleccionar categoria</option>
-                        <option value="Patente">Patente</option>
-                        <option value="Seguro">Seguro</option>
-                        <option value="VTV/BTV">VTV/BTV</option>
-                        <option value="Cubiertas">Cubiertas</option>
-                        <option value="Otros">Otros</option>
-                    </select>
-                </p>
-
-                <p><input name="fecha" placeholder="Fecha"></p>
-                <p><input name="monto" placeholder="Monto" required></p>
-                <p><input name="observaciones" placeholder="Observaciones"></p>
-
-                <button type="submit">Guardar gasto</button>
-            </form>
-
-            <hr>
-
-            <h3>Agregar vencimiento</h3>
-
-            <form method="post" action="/add_deadline">
-                <input type="hidden" name="vehicle_id" value="{v.id}">
-
-                <p>
-                    <select name="tipo" required>
-                        <option value="">Seleccionar tipo</option>
-                        <option value="Patente">Patente</option>
-                        <option value="Seguro">Seguro</option>
-                        <option value="VTV/BTV">VTV/BTV</option>
-                        <option value="Cubiertas">Cubiertas</option>
-                        <option value="Otros">Otros</option>
-                    </select>
-                </p>
-
-                <p><input name="fecha_vencimiento" type="date" required></p>
-                <p><input name="observaciones" placeholder="Observaciones"></p>
-
-                <button type="submit">Guardar vencimiento</button>
-            </form>
-
-            <hr>
-
-            {categorias_html}
-
-        </details>
-        """
+                {categorias_html}
+            </div>
+        </details>"""
 
     if not html_vehicles:
-        html_vehicles = "<p style='color:#999;'>No se encontraron vehiculos con esos filtros.</p>"
+        html_vehicles = '<div class="empty-state"><div class="empty-state-icon">🚗</div><p>No se encontraron vehiculos</p></div>'
 
-    dashboard_general = f"""
-    <div style="background:#f8f9fa; padding:20px; border-radius:10px;">
-        <h2>Resumen General</h2>
-        <p><strong>Facturacion mensual:</strong> ${total_ingresos}</p>
-        <p><strong>Gastos totales:</strong> ${total_gastos}</p>
-        <p><strong>Ganancia total:</strong> ${total_ingresos - total_gastos}</p>
-    </div>
-    """
+    ganancia_total = total_ingresos - total_gastos
+    ganancia_class = "positive" if ganancia_total >= 0 else "negative"
 
-    # Selected options
     sel_todos = "selected" if filtro == "todos" else ""
     sel_ok = "selected" if filtro == "ok" else ""
     sel_proximo = "selected" if filtro == "proximo" else ""
@@ -472,121 +779,65 @@ def home(
 
     db.close()
 
-    return HTML.format(
-        dashboard_general=dashboard_general,
-        vehicles=html_vehicles,
-        search_query=q,
-        sel_todos=sel_todos,
-        sel_ok=sel_ok,
-        sel_proximo=sel_proximo,
-        sel_vencido=sel_vencido
-    )
-
-# =========================================================
-# ALERTAS POR EMAIL
-# =========================================================
-
-@app.get("/send_alerts", response_class=HTMLResponse)
-def send_alerts_form():
-    html = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Enviar Alertas</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-    </head>
-    <body style="font-family:Arial; padding:20px; max-width:600px; margin:auto;">
-        <h1>Enviar alertas por email</h1>
-        <p style="color:#666;">Se enviara un resumen de vencimientos proximos y services vencidos al email indicado.</p>
-        <p style="color:#666; font-size:14px;">Nota: Configura las variables GMAIL_USER y GMAIL_PASSWORD en Render para que funcione.</p>
-        <form method="post" action="/send_alerts">
-            <p>
-                <label>Email destinatario</label><br>
-                <input name="email_destino" type="email" placeholder="tu@email.com" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
-            </p>
-            <p>
-                <button type="submit" style="padding:10px 20px; background:#28a745; color:white; border:none; border-radius:4px; cursor:pointer;">Enviar alerta</button>
-                <a href="/" style="padding:10px 20px; background:#6c757d; color:white; text-decoration:none; border-radius:4px; display:inline-block;">Volver</a>
-            </p>
-        </form>
-    </body>
-    </html>
-    """
-    return HTMLResponse(content=html)
-
-
-@app.post("/send_alerts", response_class=HTMLResponse)
-def send_alerts(email_destino: str = Form(...)):
-    GMAIL_USER = os.getenv("GMAIL_USER", "")
-    GMAIL_PASSWORD = os.getenv("GMAIL_PASSWORD", "")
-
-    db = SessionLocal()
-    vehicles = db.query(Vehicle).all()
-    deadlines = db.query(VehicleDeadline).all()
-
-    lineas = ["<h2>FleetUp - Resumen de alertas</h2>"]
-
-    # Services
-    lineas.append("<h3>Estado de services</h3><ul>")
-    for v in vehicles:
-        alerta_texto, _, alerta_tipo = calcular_alerta(v)
-        if alerta_tipo in ("vencido", "proximo"):
-            lineas.append(f"<li>{v.patente} - {v.modelo}: <strong>{alerta_texto}</strong></li>")
-    lineas.append("</ul>")
-
-    # Vencimientos
-    lineas.append("<h3>Vencimientos proximos o vencidos</h3><ul>")
-    for d in deadlines:
-        estado = alerta_vencimiento(d.fecha_vencimiento)
-        if "Vencido" in estado or "Proximo" in estado:
-            v = d.vehicle
-            lineas.append(f"<li>{v.patente if v else '?'} - {d.tipo}: {d.fecha_vencimiento} ({estado})</li>")
-    lineas.append("</ul>")
-
-    db.close()
-
-    cuerpo_html = "\n".join(lineas)
-
-    resultado = ""
-    if not GMAIL_USER or not GMAIL_PASSWORD:
-        resultado = """
-        <div style="background:#fff3cd; padding:15px; border-radius:8px; border:1px solid #ffc107;">
-            <p style="margin:0;"><strong>No estan configuradas las variables de entorno</strong></p>
-            <p style="margin:8px 0 0 0; font-size:14px;">Anda a tu servicio en Render, Environment, y agrega GMAIL_USER y GMAIL_PASSWORD.</p>
-        </div>"""
-    else:
-        try:
-            msg = MIMEMultipart("alternative")
-            msg["Subject"] = "FleetUp - Alertas de vencimientos"
-            msg["From"] = GMAIL_USER
-            msg["To"] = email_destino
-            msg.attach(MIMEText(cuerpo_html, "html"))
-
-            with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-                server.login(GMAIL_USER, GMAIL_PASSWORD)
-                server.sendmail(GMAIL_USER, email_destino, msg.as_string())
-
-            resultado = f'<div style="background:#d4edda; padding:15px; border-radius:8px; border:1px solid #28a745;"><p style="margin:0;">Email enviado correctamente a <strong>{email_destino}</strong></p></div>'
-        except Exception as e:
-            resultado = f'<div style="background:#f8d7da; padding:15px; border-radius:8px; border:1px solid #dc3545;"><p style="margin:0;">Error al enviar: {str(e)}</p></div>'
-
     html = f"""
     <!DOCTYPE html>
-    <html>
+    <html lang="es">
     <head>
-        <title>Resultado</title>
+        <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>FleetUp</title>
+        {MODERN_STYLES}
     </head>
-    <body style="font-family:Arial; padding:20px; max-width:600px; margin:auto;">
-        <h1>Resultado del envio</h1>
-        {resultado}
-        <p style="margin-top:20px;">
-            <a href="/" style="padding:10px 20px; background:#007bff; color:white; text-decoration:none; border-radius:4px; display:inline-block;">Volver al inicio</a>
-        </p>
+    <body>
+        <div class="container">
+            <h1>FleetUp</h1>
+            <div class="subtitle">Sistema de gestion de flota vehicular</div>
+
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-label">Facturacion</div>
+                    <div class="stat-value">${total_ingresos:,}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Gastos</div>
+                    <div class="stat-value negative">${total_gastos:,}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Ganancia</div>
+                    <div class="stat-value {ganancia_class}">${ganancia_total:,}</div>
+                </div>
+            </div>
+
+            <div class="search-bar">
+                <form method="get" action="/">
+                    <div class="form-grid">
+                        <div>
+                            <label>Buscar vehiculo</label>
+                            <input name="q" value="{q}" placeholder="Patente o modelo...">
+                        </div>
+                        <div>
+                            <label>Estado</label>
+                            <select name="filtro">
+                                <option value="todos" {sel_todos}>Todos</option>
+                                <option value="ok" {sel_ok}>Todo OK</option>
+                                <option value="proximo" {sel_proximo}>Proximo</option>
+                                <option value="vencido" {sel_vencido}>Vencido</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" type="submit">Buscar</button>
+                        <a class="btn btn-secondary" href="/">Limpiar</a>
+                    </div>
+                </form>
+            </div>
+
+            <div class="section-title">Vehiculos</div>
+            {html_vehicles}
+        </div>
     </body>
     </html>
     """
     return HTMLResponse(content=html)
+
 
 # =========================================================
 # EDITAR VEHICULO
@@ -603,29 +854,46 @@ def edit_vehicle_form(vehicle_id: int):
 
     html = f"""
     <!DOCTYPE html>
-    <html>
+    <html lang="es">
     <head>
-        <title>Editar Vehiculo</title>
+        <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Editar Vehiculo</title>
+        {MODERN_STYLES}
     </head>
-    <body style="font-family:Arial; padding:20px; max-width:600px; margin:auto;">
-        <h1>Editar Vehiculo</h1>
-        <form method="post" action="/edit_vehicle/{v.id}">
-            <p><label>Patente</label><br><input name="patente" value="{v.patente}" required style="width:100%; padding:8px;"></p>
-            <p><label>Modelo</label><br><input name="modelo" value="{v.modelo}" required style="width:100%; padding:8px;"></p>
-            <p><label>KM actuales</label><br><input name="kilometros" type="number" value="{v.kilometros}" required style="width:100%; padding:8px;"></p>
-            <p><label>Valor mensual</label><br><input name="valor_mensual" value="{v.valor_mensual}" style="width:100%; padding:8px;"></p>
+    <body>
+        <div class="container" style="max-width:700px;">
+            <h1>Editar Vehiculo</h1>
+            <div class="subtitle">Actualizar datos del vehiculo</div>
             
-            <h3>Asignacion comercial</h3>
-            <p><label>Empresa asignada</label><br><input name="empresa_asignada" value="{v.empresa_asignada or ''}" style="width:100%; padding:8px;"></p>
-            <p><label>Fecha asignacion</label><br><input name="fecha_asignacion" type="date" value="{v.fecha_asignacion or ''}" style="width:100%; padding:8px;"></p>
-            <p><label>KM en asignacion</label><br><input name="km_asignacion" type="number" value="{v.km_asignacion or 0}" style="width:100%; padding:8px;"></p>
-            
-            <p>
-                <button type="submit" style="padding:10px 20px; background:#28a745; color:white; border:none; border-radius:4px; cursor:pointer;">Guardar cambios</button>
-                <a href="/" style="padding:10px 20px; background:#6c757d; color:white; text-decoration:none; border-radius:4px; display:inline-block;">Cancelar</a>
-            </p>
-        </form>
+            <div class="card">
+                <form method="post" action="/edit_vehicle/{v.id}">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+                        <div><label>Patente</label><input name="patente" value="{v.patente}" required></div>
+                        <div><label>Modelo</label><input name="modelo" value="{v.modelo}" required></div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px;">
+                        <div><label>KM actuales</label><input name="kilometros" type="number" value="{v.kilometros}" required></div>
+                        <div><label>Valor mensual</label><input name="valor_mensual" value="{v.valor_mensual}"></div>
+                    </div>
+                    
+                    <div class="section-title">Asignacion comercial</div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+                        <div><label>Empresa</label><input name="empresa_asignada" value="{v.empresa_asignada or ''}"></div>
+                        <div><label>Fecha</label><input name="fecha_asignacion" type="date" value="{v.fecha_asignacion or ''}"></div>
+                    </div>
+                    <div style="margin-bottom:24px;">
+                        <label>KM asignacion</label>
+                        <input name="km_asignacion" type="number" value="{v.km_asignacion or 0}">
+                    </div>
+                    
+                    <div style="display:flex; gap:12px;">
+                        <button class="btn btn-primary" type="submit">Guardar cambios</button>
+                        <a class="btn btn-secondary" href="/">Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
     </body>
     </html>
     """
@@ -657,8 +925,9 @@ def edit_vehicle(
     db.close()
     return RedirectResponse("/", status_code=302)
 
+
 # =========================================================
-# RUTAS
+# RUTAS BASICAS
 # =========================================================
 
 @app.post("/add_vehicle")
@@ -672,22 +941,15 @@ def add_vehicle(
     valor_mensual: str = Form("0")
 ):
     db = SessionLocal()
-
-    nuevo = Vehicle(
-        patente=patente,
-        modelo=modelo,
-        kilometros=kilometros,
-        empresa_asignada=empresa_asignada,
-        fecha_asignacion=fecha_asignacion,
-        km_asignacion=km_asignacion,
-        valor_mensual=valor_mensual
-    )
-
-    db.add(nuevo)
+    db.add(Vehicle(
+        patente=patente, modelo=modelo, kilometros=kilometros,
+        empresa_asignada=empresa_asignada, fecha_asignacion=fecha_asignacion,
+        km_asignacion=km_asignacion, valor_mensual=valor_mensual
+    ))
     db.commit()
     db.close()
-
     return RedirectResponse("/", status_code=302)
+
 
 @app.post("/add_service")
 def add_service(
@@ -699,29 +961,15 @@ def add_service(
     observaciones: str = Form("")
 ):
     db = SessionLocal()
-
-    nuevo = Service(
-        vehicle_id=vehicle_id,
-        fecha=fecha,
-        kilometraje=kilometraje,
-        tipo_service=tipo_service,
-        costo=costo,
-        observaciones=observaciones
-    )
-
-    db.add(nuevo)
-
-    vehicle = db.query(Vehicle).filter(
-        Vehicle.id == vehicle_id
-    ).first()
-
-    if vehicle:
-        vehicle.kilometros = kilometraje
-
+    db.add(Service(vehicle_id=vehicle_id, fecha=fecha, kilometraje=kilometraje,
+                   tipo_service=tipo_service, costo=costo, observaciones=observaciones))
+    v = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
+    if v:
+        v.kilometros = kilometraje
     db.commit()
     db.close()
-
     return RedirectResponse("/", status_code=302)
+
 
 @app.post("/add_expense")
 def add_expense(
@@ -732,20 +980,12 @@ def add_expense(
     observaciones: str = Form("")
 ):
     db = SessionLocal()
-
-    nuevo = VehicleExpense(
-        vehicle_id=vehicle_id,
-        categoria=categoria,
-        fecha=fecha,
-        monto=monto,
-        observaciones=observaciones
-    )
-
-    db.add(nuevo)
+    db.add(VehicleExpense(vehicle_id=vehicle_id, categoria=categoria,
+                          fecha=fecha, monto=monto, observaciones=observaciones))
     db.commit()
     db.close()
-
     return RedirectResponse("/", status_code=302)
+
 
 @app.post("/add_deadline")
 def add_deadline(
@@ -755,88 +995,52 @@ def add_deadline(
     observaciones: str = Form("")
 ):
     db = SessionLocal()
-
-    nuevo = VehicleDeadline(
-        vehicle_id=vehicle_id,
-        tipo=tipo,
-        fecha_vencimiento=fecha_vencimiento,
-        observaciones=observaciones
-    )
-
-    db.add(nuevo)
+    db.add(VehicleDeadline(vehicle_id=vehicle_id, tipo=tipo,
+                           fecha_vencimiento=fecha_vencimiento, observaciones=observaciones))
     db.commit()
     db.close()
-
     return RedirectResponse("/", status_code=302)
+
 
 @app.post("/delete_vehicle")
-def delete_vehicle(
-    vehicle_id: int = Form(...)
-):
+def delete_vehicle(vehicle_id: int = Form(...)):
     db = SessionLocal()
-
-    item = db.query(Vehicle).filter(
-        Vehicle.id == vehicle_id
-    ).first()
-
+    item = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
     if item:
         db.delete(item)
         db.commit()
-
     db.close()
-
     return RedirectResponse("/", status_code=302)
+
 
 @app.post("/delete_service")
-def delete_service(
-    service_id: int = Form(...)
-):
+def delete_service(service_id: int = Form(...)):
     db = SessionLocal()
-
-    item = db.query(Service).filter(
-        Service.id == service_id
-    ).first()
-
+    item = db.query(Service).filter(Service.id == service_id).first()
     if item:
         db.delete(item)
         db.commit()
-
     db.close()
-
     return RedirectResponse("/", status_code=302)
+
 
 @app.post("/delete_expense")
-def delete_expense(
-    expense_id: int = Form(...)
-):
+def delete_expense(expense_id: int = Form(...)):
     db = SessionLocal()
-
-    item = db.query(VehicleExpense).filter(
-        VehicleExpense.id == expense_id
-    ).first()
-
+    item = db.query(VehicleExpense).filter(VehicleExpense.id == expense_id).first()
     if item:
         db.delete(item)
         db.commit()
-
     db.close()
-
     return RedirectResponse("/", status_code=302)
 
+
 @app.post("/delete_deadline")
-def delete_deadline(
-    deadline_id: int = Form(...)
-):
+def delete_deadline(deadline_id: int = Form(...)):
     db = SessionLocal()
-
-    item = db.query(VehicleDeadline).filter(
-        VehicleDeadline.id == deadline_id
-    ).first()
-
+    item = db.query(VehicleDeadline).filter(VehicleDeadline.id == deadline_id).first()
     if item:
         db.delete(item)
         db.commit()
-
     db.close()
-
     return RedirectResponse("/", status_code=302)
