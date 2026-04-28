@@ -464,10 +464,10 @@ links = [
 ("vencimientos", "/vencimientos", "📅 Vencimientos"),
 ("alertas", "/send_alerts", "🔔 Enviar alertas"),
 ]
-html = ‘<nav><a class="nav-brand" href="/">⚡ FleetUp</a><div class="nav-links">’
+html = '<nav><a class="nav-brand" href="/">⚡ FleetUp</a><div class="nav-links">'
 for key, href, label in links:
 cls = "nav-link active" if active == key else "nav-link"
-html += f’<a class="{cls}" href="{href}">{label}</a>’
+html += f'<a class="{cls}" href="{href}">{label}</a>'
 html += "</div></nav>"
 return html
 
@@ -491,10 +491,10 @@ return f"""<!DOCTYPE html>
 
 def badge_alerta(estado):
 if "🔴" in estado:
-return f’<span class="badge badge-danger">{estado}</span>’
+return f'<span class="badge badge-danger">{estado}</span>'
 elif "🟡" in estado:
-return f’<span class="badge badge-warn">{estado}</span>’
-return f’<span class="badge badge-ok">{estado}</span>’
+return f'<span class="badge badge-warn">{estado}</span>'
+return f'<span class="badge badge-ok">{estado}</span>'
 
 def card_class(tipo):
 if tipo == "vencido":
