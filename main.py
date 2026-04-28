@@ -1,6 +1,6 @@
 # main.py
 # FleetUp + Dashboard Financiero + Gastos Separados por Categoria + Vencimientos + Desplegables
-# FASE 4 COMPLETA - segura sobre tu base real
+# PASO 2: Edicion de vehiculos
 
 import os
 from datetime import datetime
@@ -335,6 +335,10 @@ def home():
             <p><strong>Gasto total:</strong> ${gasto_total}</p>
             <p><strong>Ganancia:</strong> ${ganancia}</p>
 
+            <p>
+                <a href="/edit_vehicle/{v.id}" style="padding:8px 12px; background:#007bff; color:white; text-decoration:none; border-radius:4px; display:inline-block; margin-top:10px;">Editar vehiculo</a>
+            </p>
+
             <hr>
 
             <h3>Registrar service</h3>
@@ -423,6 +427,75 @@ def home():
         dashboard_general=dashboard_general,
         vehicles=html_vehicles
     )
+
+# =========================================================
+# EDITAR VEHICULO
+# =========================================================
+
+@app.get("/edit_vehicle/{vehicle_id}", response_class=HTMLResponse)
+def edit_vehicle_form(vehicle_id: int):
+    db = SessionLocal()
+    v = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
+    db.close()
+
+    if not v:
+        return RedirectResponse("/")
+
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Editar Vehiculo</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+    </head>
+    <body style="font-family:Arial; padding:20px; max-width:600px; margin:auto;">
+        <h1>Editar Vehiculo</h1>
+        <form method="post" action="/edit_vehicle/{v.id}">
+            <p><label>Patente</label><br><input name="patente" value="{v.patente}" required style="width:100%; padding:8px;"></p>
+            <p><label>Modelo</label><br><input name="modelo" value="{v.modelo}" required style="width:100%; padding:8px;"></p>
+            <p><label>KM actuales</label><br><input name="kilometros" type="number" value="{v.kilometros}" required style="width:100%; padding:8px;"></p>
+            <p><label>Valor mensual</label><br><input name="valor_mensual" value="{v.valor_mensual}" style="width:100%; padding:8px;"></p>
+            
+            <h3>Asignacion comercial</h3>
+            <p><label>Empresa asignada</label><br><input name="empresa_asignada" value="{v.empresa_asignada or ''}" style="width:100%; padding:8px;"></p>
+            <p><label>Fecha asignacion</label><br><input name="fecha_asignacion" type="date" value="{v.fecha_asignacion or ''}" style="width:100%; padding:8px;"></p>
+            <p><label>KM en asignacion</label><br><input name="km_asignacion" type="number" value="{v.km_asignacion or 0}" style="width:100%; padding:8px;"></p>
+            
+            <p>
+                <button type="submit" style="padding:10px 20px; background:#28a745; color:white; border:none; border-radius:4px; cursor:pointer;">Guardar cambios</button>
+                <a href="/" style="padding:10px 20px; background:#6c757d; color:white; text-decoration:none; border-radius:4px; display:inline-block;">Cancelar</a>
+            </p>
+        </form>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
+
+
+@app.post("/edit_vehicle/{vehicle_id}")
+def edit_vehicle(
+    vehicle_id: int,
+    patente: str = Form(...),
+    modelo: str = Form(...),
+    kilometros: int = Form(...),
+    empresa_asignada: str = Form(""),
+    fecha_asignacion: str = Form(""),
+    km_asignacion: int = Form(0),
+    valor_mensual: str = Form("0")
+):
+    db = SessionLocal()
+    v = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
+    if v:
+        v.patente = patente
+        v.modelo = modelo
+        v.kilometros = kilometros
+        v.empresa_asignada = empresa_asignada
+        v.fecha_asignacion = fecha_asignacion
+        v.km_asignacion = km_asignacion
+        v.valor_mensual = valor_mensual
+        db.commit()
+    db.close()
+    return RedirectResponse("/", status_code=302)
 
 # =========================================================
 # RUTAS
