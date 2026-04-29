@@ -939,10 +939,29 @@ def home(
                     <h4 style="margin-bottom:12px; font-size:12px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:1px;">Gastos</h4>
                     {'<table><thead><tr><th>Fecha</th><th>Monto</th><th>Obs.</th><th></th></tr></thead><tbody>' + gastos_rows + '</tbody></table>' if gastos_rows else '<div class="empty-state" style="padding:30px 20px;"><p>Sin gastos</p></div>'}
                     
+                    <h4 style="margin-top:20px; margin-bottom:12px; font-size:12px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:1px;">Agregar gasto - {cat}</h4>
+                    <form method="post" action="/add_expense" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                        <input type="hidden" name="vehicle_id" value="{v.id}">
+                        <input type="hidden" name="categoria" value="{cat}">
+                        <div><label>Fecha</label><input name="fecha" type="date"></div>
+                        <div><label>Monto</label><input name="monto" placeholder="0" required></div>
+                        <div style="grid-column:1/-1;"><label>Observaciones</label><input name="observaciones" placeholder="Opcional"></div>
+                        <div style="grid-column:1/-1;"><button class="btn btn-primary btn-sm" type="submit">Guardar gasto</button></div>
+                    </form>
+                    
                     <div class="divider"></div>
                     
                     <h4 style="margin-bottom:12px; font-size:12px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:1px;">Vencimientos</h4>
                     {'<table><thead><tr><th>Fecha</th><th>Estado</th><th>Obs.</th><th></th></tr></thead><tbody>' + venc_rows + '</tbody></table>' if venc_rows else '<div class="empty-state" style="padding:30px 20px;"><p>Sin vencimientos</p></div>'}
+                    
+                    <h4 style="margin-top:20px; margin-bottom:12px; font-size:12px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:1px;">Agregar vencimiento - {cat}</h4>
+                    <form method="post" action="/add_deadline" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                        <input type="hidden" name="vehicle_id" value="{v.id}">
+                        <input type="hidden" name="tipo" value="{cat}">
+                        <div><label>Fecha vencimiento</label><input name="fecha_vencimiento" type="date" required></div>
+                        <div><label>Observaciones</label><input name="observaciones" placeholder="Opcional"></div>
+                        <div style="grid-column:1/-1;"><button class="btn btn-primary btn-sm" type="submit">Guardar vencimiento</button></div>
+                    </form>
                 </div>
             </details>"""
 
