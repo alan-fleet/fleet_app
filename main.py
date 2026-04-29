@@ -983,6 +983,25 @@ def home(
                 <details class="inner-section" open>
                     <summary>Dashboard financiero</summary>
                     <div class="inner-content">
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; padding:16px; background:var(--bg-primary); border-radius:8px;">
+                            <div>
+                                <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">KM Actuales</div>
+                                <div style="font-size:18px; font-weight:700; font-family:'JetBrains Mono', monospace;">{v.kilometros:,} km</div>
+                            </div>
+                            <div>
+                                <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">KM Asignacion</div>
+                                <div style="font-size:18px; font-weight:700; font-family:'JetBrains Mono', monospace;">{v.km_asignacion:,} km</div>
+                            </div>
+                            <div>
+                                <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Empresa Asignada</div>
+                                <div style="font-size:14px; font-weight:600;">{v.empresa_asignada or '—'}</div>
+                            </div>
+                            <div>
+                                <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Fecha Asignacion</div>
+                                <div style="font-size:14px; font-weight:600;">{v.fecha_asignacion or '—'}</div>
+                            </div>
+                        </div>
+                        
                         <div class="mini-stats">
                             <div class="mini-stat">
                                 <div class="mini-stat-label">Ingreso</div>
