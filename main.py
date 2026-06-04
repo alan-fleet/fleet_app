@@ -20,9 +20,16 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./vehicles.db")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://")
 
+connect_args = {"check_same_thread": False} if "sqlite" in DATABASE_URL else {
+    "sslmode": "require",
+    "connect_timeout": 10
+}
+
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
+    connect_args=connect_args,
+    pool_pre_ping=True,
+    pool_recycle=300
 )
 
 SessionLocal = sessionmaker(
